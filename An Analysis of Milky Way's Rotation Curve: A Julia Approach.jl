@@ -31,7 +31,7 @@ end
 begin
 	using CSV, DataFrames
 	
-	file_path = "DataSets/TwentyKTWO.csv"
+	file_path = "DataSets/TwentyKONE.csv"
 	
 	# Load the Gaia data
 	df = CSV.read(file_path, DataFrame)
@@ -82,16 +82,14 @@ end
 
 # ╔═╡ f96a61ab-2506-4915-b975-4713534f4250
 begin
-    ### PlutoUI and Plots
 	using Plots
-	
 	### Keplerian rotation curve function
 	G = 4.302e-6  # kpc * (km/s)^2 / Msun
 	
 	keplerian_velocity(r, M) = sqrt(G * M / r)
 	
 	### Filtered data placeholder 
-	N_filtered = N  
+	N_filtered = filter(row -> row.true_velocity ≤ 270, N)  
 	
 	### Galactic rotation curve
 	r_values = 0.1:0.1:xmax # Range of distances (kpc)
@@ -100,7 +98,7 @@ begin
 	### Generating scatter plot and overlaying Keplerian curve
 	scatter(N_filtered.distance_kpc, N_filtered.true_velocity, yerr=N_filtered.true_velocity_error, 
 	        xlabel="Distance (kpc)", ylabel="True Velocity (km/s)", 
-	        title="Velocity vs Distance", legend=true, label="Observed Object", xlims=(0, xmax), ylims=(0, 1000))
+	        title="Velocity vs Distance", legend=true, label="Observed Object", xlims=(0, xmax), ylims=(0, 500))
 	
 	plot!(r_values, v_kepler, label="Keplerian Curve", legend = true, linewidth=2, color=:red)
 	
@@ -264,6 +262,22 @@ begin
 	N.true_velocity = sqrt.(N.tangential_velocity_corrected.^2 .+ coalesce.(N.radial_velocity, 0.0).^2)
 end
 
+# ╔═╡ ddd1d5c6-cbfd-48e4-89b4-bfb3767d7c14
+begin
+	md"""
+	### Rotational Velocity Constraints & The Keplerian Orbit
+
+	Many papers such as one written by Doctor Ueshima [(2010)](https://www-sk.icrr.u-tokyo.ac.jp/xmass/publist/ueshima_PhD.pdf), discuss a dark matter distribution that is derived from 21cm Hydrogen lines from hydrogen clouds in our galaxy.
+
+	According to such data, anything with a rough speed of ~$270km/s$ within the galactic neighborhood is moving too fast to be in a long term stable bound orbit around the Galactic center. These would include high-velocity stars near the galactic core ~ 25 kpc away in the galactic core orbiting the galactic center or run-away stars. [(Wikipedia)] (https://en.wikipedia.org/wiki/Stellar_kinematics) 
+
+	In order to account for this, we will disclude all objects within our data that have a true velocity over ~$270km/s$. 
+	
+	This will lead us to a model which we will later overlay on our data below.
+	
+	"""
+end
+
 # ╔═╡ fcbbfa5d-bbf3-480b-b1b0-c4b835525113
 begin
 	md"""
@@ -292,7 +306,7 @@ end
 # ╔═╡ 947e2007-d7e9-4049-b324-0b41d13c80b3
 begin
 	md"""
-	This graph shows us that the orbital velocities of objects about the galactic center are not Keplerian. Instead the data here indicates a strange $linear$ relationship!
+	This graph shows us that the orbital velocities of objects about the galactic center are not Keplerian. Nor does the data here indicate a linear relationship!
 	"""
 end
 
@@ -453,7 +467,35 @@ begin
 end
 
 # ╔═╡ e03f5d0e-5f31-45a2-aaa1-1e30003a7eca
+begin
+	md"""
+	As we see here, the left side of the plots do not seem to follow the known model.
 
+	In order to understand why, we must realize that our calculation of True  Velocity was infact quite simplified and, infact, incorrect.
+
+	Gaia, our source, does not correct for the orbital velocity of our sun and the solar system. This means, in our frame of reference, all the stars within our neighborhood with similar velocities seem to move with near-zero velocities.
+
+	Data of Velocities for objects further than ~ 8 kpc seem to follow the estimation we have from our dark matter / H 21cm model.
+	"""
+end
+
+	
+
+# ╔═╡ 6b1f254e-9926-40af-b1b9-4a30603ff595
+begin
+	md"""
+	# NEXT STEPS
+
+	Parag - We can choose to ignore a certain or random number of stars from the galactic core or RA to get just stars on the outside. Our data is very Sun-Frame-Of_Reference right now.
+
+	Santi - TwentyK[NUMBER] files. Make this user-selectable.
+
+	Isaac - List all statistical things from the labs which we can use here.
+
+	
+	
+	"""
+end
 
 # ╔═╡ 729d9763-c8ca-4c2d-b208-33373bf66bf5
 begin
@@ -471,7 +513,7 @@ end
 # ╔═╡ Cell order:
 # ╟─d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
 # ╟─8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
-# ╠═0b0fbb27-6b38-4ab7-8b14-18a3023698b6
+# ╟─0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 # ╟─d3c12dbb-0fc1-4d31-bf5e-5812c5e51fb8
 # ╟─bceadb12-7d88-4a8b-aae0-a696366627ce
 # ╟─0f93be8e-c045-4cba-8755-44bf01faad1e
@@ -481,6 +523,7 @@ end
 # ╟─5580ffda-b8fa-4504-830e-588c91bcdbda
 # ╟─4cb64ec9-4c1c-47ec-857d-45e764df2e56
 # ╟─db27aa1b-23da-4ace-bfda-9a34ecf4554a
+# ╟─ddd1d5c6-cbfd-48e4-89b4-bfb3767d7c14
 # ╟─fcbbfa5d-bbf3-480b-b1b0-c4b835525113
 # ╟─5ea2864d-4b5a-4fed-94b8-f59f1ca13f95
 # ╟─f96a61ab-2506-4915-b975-4713534f4250
@@ -490,6 +533,7 @@ end
 # ╟─9f4404c3-ca98-4be7-9c8f-187ff582250e
 # ╟─97e6ab22-be14-4b2a-9032-f5432839ac23
 # ╟─3e5f61b8-edbc-41b2-a047-0656bf419bdb
-# ╠═e03f5d0e-5f31-45a2-aaa1-1e30003a7eca
+# ╟─e03f5d0e-5f31-45a2-aaa1-1e30003a7eca
+# ╟─6b1f254e-9926-40af-b1b9-4a30603ff595
 # ╟─729d9763-c8ca-4c2d-b208-33373bf66bf5
-# ╠═e25a61ff-03e8-4cd4-bec2-52a00834b011
+# ╟─e25a61ff-03e8-4cd4-bec2-52a00834b011

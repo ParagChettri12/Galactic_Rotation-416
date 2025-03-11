@@ -31,7 +31,7 @@ end
 begin
 	using CSV, DataFrames
 	
-	file_path = "TwentyKTWO.csv"
+	file_path = "DataSets/TwentyKTWO.csv"
 	
 	# Load the Gaia data
 	df = CSV.read(file_path, DataFrame)
@@ -471,7 +471,7 @@ end
 # ╔═╡ Cell order:
 # ╟─d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
 # ╟─8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
-# ╟─0b0fbb27-6b38-4ab7-8b14-18a3023698b6
+# ╠═0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 # ╟─d3c12dbb-0fc1-4d31-bf5e-5812c5e51fb8
 # ╟─bceadb12-7d88-4a8b-aae0-a696366627ce
 # ╟─0f93be8e-c045-4cba-8755-44bf01faad1e
@@ -492,4 +492,4 @@ end
 # ╟─3e5f61b8-edbc-41b2-a047-0656bf419bdb
 # ╠═e03f5d0e-5f31-45a2-aaa1-1e30003a7eca
 # ╟─729d9763-c8ca-4c2d-b208-33373bf66bf5
-# ╟─e25a61ff-03e8-4cd4-bec2-52a00834b011
+# ╠═e25a61ff-03e8-4cd4-bec2-52a00834b011

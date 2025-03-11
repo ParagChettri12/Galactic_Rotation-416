@@ -127,6 +127,12 @@ begin
 	Where: $\alpha_{GP}$ and $\delta_{GP}$ are the coordinates of the Galactic north pole
 	
 	Where: $b$ is the Galactic latitude
+
+	We can now restrict our data by only allowing a certain maximum deviation from 0 of $b$. 
+	
+	For our data, will allow you to choose the threshold of deviation in degrees.
+
+	As deviation can be positive or negative, we will use the absolute value for $b$ to limit our values.
 	"""
 end
 

@@ -29,18 +29,17 @@ end
 
 # ╔═╡ 0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 begin
-		using CSV, DataFrames
+	using CSV, DataFrames
 	
-	file_path = "FifteenThousandONE.csv"
+	file_path = "TwentyKTWO.csv"
 	
 	# Load the Gaia data
 	df = CSV.read(file_path, DataFrame)
-	
 	# Drop rows with missing RA or Dec values
 	df1 = dropmissing(df, [:ra, :dec])
 	
 	# Define the function to filter stars based on their proximity to the Galactic plane
-	function filter_galactic_plane(df1; threshold=40)
+	function filter_galactic_plane(df1; threshold=2.5)
 	    # Convert RA and Dec to radians
 	    ra_rad = deg2rad.(df1.ra)
 	    dec_rad = deg2rad.(df1.dec)
@@ -73,20 +72,44 @@ begin
 	using PlutoUI
 	md"""
 	**Adjust X-Axis Scale (View Window)  
-	Max D (kpc):** $(@bind x_max Slider(0:1:50; default=25, show_value=true))
+	Max D (kpc):** $(@bind xmax Slider(0:1:50; default=25, show_value=true))
+	
+	Galactic Enclosed Mass / Solar Masses:** $(@bind mass_slider Slider(1e10:1e10:1e12, show_value=true, default=1e11))
+	
+	Fit Gradient:** $(@bind gradient_slider Slider(0.0:0.05:80, show_value=true, default=40))
 	"""
 end
 
 # ╔═╡ f96a61ab-2506-4915-b975-4713534f4250
 begin
+    ### PlutoUI and Plots
 	using Plots
-	# Filter the data based on the slider range
-	N_filtered = N
-
-	# Scatter plot with filtered data
+	
+	### Keplerian rotation curve function
+	G = 4.302e-6  # kpc * (km/s)^2 / Msun
+	
+	keplerian_velocity(r, M) = sqrt(G * M / r)
+	
+	### Filtered data placeholder 
+	N_filtered = N  
+	
+	### Galactic rotation curve
+	r_values = 0.1:0.1:xmax # Range of distances (kpc)
+	v_kepler = keplerian_velocity.(r_values, mass_slider)  # Keplerian velocity based on current mass
+	
+	### Generating scatter plot and overlaying Keplerian curve
 	scatter(N_filtered.distance_kpc, N_filtered.true_velocity, yerr=N_filtered.true_velocity_error, 
 	        xlabel="Distance (kpc)", ylabel="True Velocity (km/s)", 
-	        title="Velocity vs Distance", legend=false, xlims=(0, x_max), ylims=(0, 500))
+	        title="Velocity vs Distance", legend=true, label="Observed Object", xlims=(0, xmax), ylims=(0, 1000))
+	
+	plot!(r_values, v_kepler, label="Keplerian Curve", legend = true, linewidth=2, color=:red)
+	
+	### Adding black line with adjustable gradient
+	x_values = 0:0.1:xmax
+	y_values = gradient_slider * x_values  # Linear gradient function with slope from slider
+	
+	plot!(x_values, y_values, label="Gradient Line", linewidth=2, color=:black)
+
 end
 
 # ╔═╡ d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
@@ -130,9 +153,9 @@ begin
 
 	We can now restrict our data by only allowing a certain maximum deviation from 0 of $b$. 
 	
-	For our data, will allow you to choose the threshold of deviation in degrees.
-
 	As deviation can be positive or negative, we will use the absolute value for $b$ to limit our values.
+	
+	We will choose a value of $b = 5^\circ$.
 	"""
 end
 
@@ -215,17 +238,19 @@ begin
 	
 	The true velocity $V_{\text{true}}$ is calculated using the radial velocity $V_{\text{radial}}$ and tangential velocity $V_{\text{tangential}}$:
 	
-	$V_{\text{true}} = \sqrt{(V_{\text{radial}} - 220)^2 + V_{\text{tangential}}^2}$
+	$V_{\text{true}} = \sqrt{V_{\text{radial}}^2 + V_{\text{tangential}}^2}$
 
 	
 	where: $V_{\text{true}}$ is the true velocity in $km/s$ 
 	
 	where: $V_{\text{radial}}$ is the radial velocity (along the line of sight) 
 
-	where: $-220$ is the correction for solar velocity. For simplicity, we assumed uniform opposite velocity. 
+
 	
 	where: $V_{\text{tangential}}$ is the tangential velocity (perpendicular to the line of sight)
 
+	For simplicity's sake, we will ignore the fact that our sun and solar system are also orbiting the Galactic center.
+	
 	The array of $V_{\text{true}}$ in $km/s$ is shown below.
 	
 	"""
@@ -235,9 +260,27 @@ end
 begin
  # Compute true velocity (km/s), filtering out missing radial velocities
 	N.true_velocity_error = sqrt.(N.tangential_velocity_error.^2 .+ coalesce.(N.radial_velocity_error, 0.0).^2)
-	N.tangential_velocity_corrected = N.tangential_velocity.-220
+	N.tangential_velocity_corrected = N.tangential_velocity
 	N.true_velocity = sqrt.(N.tangential_velocity_corrected.^2 .+ coalesce.(N.radial_velocity, 0.0).^2)
 end
+
+# ╔═╡ fcbbfa5d-bbf3-480b-b1b0-c4b835525113
+begin
+	md"""
+
+	As we know, Keplerian orbits are a fundamental part of Newtonian Physics, which we can overlay to check againt in this case. 
+
+	$V_{\text{Keplerian}}(R) = \sqrt{\frac{GM_{\text{enclosed}}}{R}}$
+
+	Where: $V_{\text{Keplerian}}$ is the orbital velocity in $km/s$
+
+	Where: $M_{\text{enclosed}}$ is the mass within the galactic center that other galactic objects orbit.
+
+	Where: $R$ is the distance from that mass.
+
+	"""
+end
+	
 
 # ╔═╡ 5ea2864d-4b5a-4fed-94b8-f59f1ca13f95
 begin
@@ -249,7 +292,7 @@ end
 # ╔═╡ 947e2007-d7e9-4049-b324-0b41d13c80b3
 begin
 	md"""
-	As one would expect, closer stars are detected at a greater rate than those further away. This leads to a massive clutter of stars that are closer to us on the graph.
+	This graph shows us that the orbital velocities of objects about the galactic center are not Keplerian. Instead the data here indicates a strange $linear$ relationship!
 	"""
 end
 
@@ -313,6 +356,8 @@ begin
 	$V_{\text{total}}(r)$
 
 	This is our final estimation as a weighted sum of the given distributions.
+
+	Source: [(Ueshima, 2010)](https://www-sk.icrr.u-tokyo.ac.jp/xmass/publist/ueshima_PhD.pdf)
 	"""
 end
 
@@ -389,7 +434,7 @@ begin
 	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
 	scatter(N_filtered.distance_kpc, N_filtered.true_velocity, 
 	        yerr=N_filtered.true_velocity_error, xlabel="Distance (kpc)", ylabel="True Velocity (km/s)", 
-	        title="Velocity vs Distance", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 500))
+	        title="Velocity vs Distance", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 1000))
 	
 	# Overlay the rotation curve components and the total curve
 	plot!(r, V_bulge_curve, label="Bulge", color=:blue, linewidth=2)
@@ -404,7 +449,23 @@ begin
 	ylabel!("True Velocity (km/s)")
 	title!("Velocity vs Distance")
 	xlims!(0, xmax_2)
-	ylims!(0, 500)
+	ylims!(0, 1000)
+end
+
+# ╔═╡ e03f5d0e-5f31-45a2-aaa1-1e30003a7eca
+
+
+# ╔═╡ 729d9763-c8ca-4c2d-b208-33373bf66bf5
+begin
+	md"""
+	
+	### **Citations**
+
+
+	
+	[Ueshima, K. (2010). Study of pulse shape discrimination and low background techniques for liquid xenon dark matter detectors. Department of Physics, School of Science, University of Tokyo.](https://www-sk.icrr.u-tokyo.ac.jp/xmass/publist/ueshima_PhD.pdf)
+
+	"""
 end
 
 # ╔═╡ Cell order:
@@ -419,7 +480,8 @@ end
 # ╟─ae23b057-cb23-408f-801d-db86b29ce617
 # ╟─5580ffda-b8fa-4504-830e-588c91bcdbda
 # ╟─4cb64ec9-4c1c-47ec-857d-45e764df2e56
-# ╠═db27aa1b-23da-4ace-bfda-9a34ecf4554a
+# ╟─db27aa1b-23da-4ace-bfda-9a34ecf4554a
+# ╟─fcbbfa5d-bbf3-480b-b1b0-c4b835525113
 # ╟─5ea2864d-4b5a-4fed-94b8-f59f1ca13f95
 # ╟─f96a61ab-2506-4915-b975-4713534f4250
 # ╟─8e2b556d-aa78-4993-adad-f8c9d0fe6901
@@ -428,4 +490,6 @@ end
 # ╟─9f4404c3-ca98-4be7-9c8f-187ff582250e
 # ╟─97e6ab22-be14-4b2a-9032-f5432839ac23
 # ╟─3e5f61b8-edbc-41b2-a047-0656bf419bdb
-# ╠═e25a61ff-03e8-4cd4-bec2-52a00834b011
+# ╠═e03f5d0e-5f31-45a2-aaa1-1e30003a7eca
+# ╟─729d9763-c8ca-4c2d-b208-33373bf66bf5
+# ╟─e25a61ff-03e8-4cd4-bec2-52a00834b011

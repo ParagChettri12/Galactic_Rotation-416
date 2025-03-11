@@ -24,23 +24,49 @@ begin
 	Pkg.add([
 	    "CSV", 
 	    "DataFrames", 
-	    "Plots", 
-	])
+	    "Plots"])
 end
 
 # ╔═╡ 0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 begin
-	using CSV, DataFrames
+		using CSV, DataFrames
+	
 	file_path = "FifteenThousandONE.csv"
+	
 	# Load the Gaia data
 	df = CSV.read(file_path, DataFrame)
-	# Define your desired region in RA and DEC (example: near the Galactic plane)
-	ra_min, ra_max = 30.0, 330.0   # Right Ascension range in degrees (e.g., 30° to 330°)
-    dec_min, dec_max = -10.0, 10.0 # Declination range in degrees (e.g., -10° to 10°)
+	
+	# Drop rows with missing RA or Dec values
+	df1 = dropmissing(df, [:ra, :dec])
+	
+	# Define the function to filter stars based on their proximity to the Galactic plane
+	function filter_galactic_plane(df1; threshold=40)
+	    # Convert RA and Dec to radians
+	    ra_rad = deg2rad.(df1.ra)
+	    dec_rad = deg2rad.(df1.dec)
+	
+	    # Galactic north pole coordinates in radians
+	    ra_gp = deg2rad(192.8595)
+	    dec_gp = deg2rad(27.1284)
+	
+	    # Compute sin(b)
+	    sin_b = sin.(dec_rad) .* sin(dec_gp) .+ cos.(dec_rad) .* cos(dec_gp) .* cos.(ra_rad .- ra_gp)
+	
+	    # Compute Galactic latitude b in degrees
+	    b = rad2deg.(asin.(sin_b))
+	
+	    # Filter stars near the Galactic plane (|b| < threshold)
+	    return df1[abs.(b) .< threshold, :]
+	end
+	
+	# Apply filtering: only stars with non-missing parallax, positive parallax, and proper motions
+	filtered_df = filter_galactic_plane(df1)
+	
+	# Further filtering for stars with non-missing parallax, pmra, and pmdec
+	N = filter(row -> !ismissing(row.parallax) && row.parallax > 0 && !ismissing(row.pmra) && !ismissing(row.pmdec), filtered_df)
 
-	# Filter the data: stars in the desired RA/DEC region and with reasonable error thresholds
-	    N = filter(row -> !ismissing(row.parallax) && row.parallax > 0 && !ismissing(row.pmra) && !ismissing(row.pmdec),  df)
 end
+
 
 # ╔═╡ 8e2b556d-aa78-4993-adad-f8c9d0fe6901
 begin
@@ -69,6 +95,40 @@ md"""
 # An Analysis of Milky Way's Rotation Curve: A Julia Approach
 ## Data from Gaia DR 2
 """
+
+# ╔═╡ 8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
+begin
+	md"""
+	### Conversion from (RA, Dec) to Galactic (l, b)
+	
+	The relationship between Equatorial and Galactic coordinates is given by a rotation transformation. The Galactic north pole is at:
+	
+	
+	$\alpha_{GP} = 192.8595^\circ, \quad \delta_{GP} = 27.1284^\circ$
+	
+	The Galactic center is at:
+	
+	$\alpha_{GC} = 266.4051^\circ, \quad \delta_{GC} = -28.9362^\circ$
+	
+	The inclination angle is:
+	
+
+	$i = 62.8717^\circ$
+	
+	Using these, we can compute the Galactic latitude $b$ for each star. The formula for $b$ is given by:
+	
+	$\sin(b) = \sin(\delta) \sin(\delta_{GP}) + \cos(\delta) \cos(\delta_{GP}) \cos(\alpha - \alpha_{GP})$
+	
+	
+	Where: $\alpha$ is the Right Ascension $(RA)$ of the star in degrees
+	
+	Where: $\delta$ is the Declination $(Dec)$ of the star in degrees
+	
+	Where: $\alpha_{GP}$ and $\delta_{GP}$ are the coordinates of the Galactic north pole
+	
+	Where: $b$ is the Galactic latitude
+	"""
+end
 
 # ╔═╡ d3c12dbb-0fc1-4d31-bf5e-5812c5e51fb8
 begin
@@ -343,6 +403,7 @@ end
 
 # ╔═╡ Cell order:
 # ╟─d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
+# ╟─8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
 # ╟─0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 # ╟─d3c12dbb-0fc1-4d31-bf5e-5812c5e51fb8
 # ╟─bceadb12-7d88-4a8b-aae0-a696366627ce
@@ -352,7 +413,7 @@ end
 # ╟─ae23b057-cb23-408f-801d-db86b29ce617
 # ╟─5580ffda-b8fa-4504-830e-588c91bcdbda
 # ╟─4cb64ec9-4c1c-47ec-857d-45e764df2e56
-# ╟─db27aa1b-23da-4ace-bfda-9a34ecf4554a
+# ╠═db27aa1b-23da-4ace-bfda-9a34ecf4554a
 # ╟─5ea2864d-4b5a-4fed-94b8-f59f1ca13f95
 # ╟─f96a61ab-2506-4915-b975-4713534f4250
 # ╟─8e2b556d-aa78-4993-adad-f8c9d0fe6901
@@ -361,6 +422,4 @@ end
 # ╟─9f4404c3-ca98-4be7-9c8f-187ff582250e
 # ╟─97e6ab22-be14-4b2a-9032-f5432839ac23
 # ╟─3e5f61b8-edbc-41b2-a047-0656bf419bdb
-# ╟─e25a61ff-03e8-4cd4-bec2-52a00834b011
-
-
+# ╠═e25a61ff-03e8-4cd4-bec2-52a00834b011

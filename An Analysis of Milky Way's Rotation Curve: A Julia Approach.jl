@@ -580,7 +580,7 @@ begin
 	ylabel!("Orbital Velocity (km/s)")
 	title!("Orbital Velocity vs. Galactocentric Radius")
 	xlims!(0, xmax_2)
-	ylims!(0, 350)
+	ylims!(0, 450)
 end
 
 

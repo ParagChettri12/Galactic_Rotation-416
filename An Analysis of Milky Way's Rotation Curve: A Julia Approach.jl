@@ -390,6 +390,13 @@ begin
 
 end
 
+# ╔═╡ 52be580b-0add-4c32-aba1-719b5898c5fa
+begin
+	md"""
+	This calculation of $V_{\phi}$ is jus the given deviation from the Galactic mean orbital velocity which we can assign as a normalizing value on our graph for disk stars as +220 km/s [(Stellar Kinematics)](https://en.wikipedia.org/wiki/Stellar_kinematics).
+	"""
+end
+
 # ╔═╡ ddd1d5c6-cbfd-48e4-89b4-bfb3767d7c14
 begin
 	md"""
@@ -632,6 +639,7 @@ end
 # ╟─58c42bec-6967-4023-8d52-eea5376ec0b8
 # ╟─8ee908d3-f28e-4146-8a10-811fde6938cc
 # ╟─c6d7fed2-e29b-4396-9d19-c07e96a02bd9
+# ╟─52be580b-0add-4c32-aba1-719b5898c5fa
 # ╟─ddd1d5c6-cbfd-48e4-89b4-bfb3767d7c14
 # ╟─fcbbfa5d-bbf3-480b-b1b0-c4b835525113
 # ╟─059cb579-672a-4ff9-9477-c3decc2c785e

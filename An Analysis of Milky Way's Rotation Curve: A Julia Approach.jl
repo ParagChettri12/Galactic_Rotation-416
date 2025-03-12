@@ -22,7 +22,8 @@ begin
 	
 	# Install required packages
 	Pkg.add([
-	    "CSV", 
+	    "CSV",
+		"LinearAlgebra",
 	    "DataFrames", 
 	    "Plots"])
 end
@@ -108,6 +109,62 @@ begin
 	
 	plot!(x_values, y_values, label="Gradient Line", linewidth=2, color=:black)
 
+end
+
+# ╔═╡ c6d7fed2-e29b-4396-9d19-c07e96a02bd9
+begin
+	using LinearAlgebra
+	# Constants
+	R_sun = 26.0  # kpc, Sun's distance from Galactic center
+	
+	# Function to convert RA, Dec, d to Galactocentric radius and velocities
+	function galactocentric_transform(ra, dec, d, v_ra, v_dec, v_r)
+	    # Convert to radians
+	    α = deg2rad(ra)
+	    δ = deg2rad(dec)
+	    
+	    # Step 2: Convert Equatorial to Cartesian coordinates relative to Sun
+	    x = d * cos(δ) * cos(α)
+	    y = d * cos(δ) * sin(α)
+	    z = d * sin(δ)
+	    
+	    # Rotation matrix from Equatorial to Galactic coordinates
+	    R = [-0.05487556 -0.87343709 -0.48383502;
+	         +0.49410943 -0.44482963 +0.74698224;
+	         -0.86766615 -0.19807637 +0.45598378]
+	    
+	    # Galactic Cartesian coordinates relative to Sun
+	    galactic_coords = R * [x, y, z]
+	    X, Y, Z = galactic_coords
+	    
+	    # Shift to Galactocentric frame
+	    X′ = X + R_sun
+	    Y′ = Y
+	    Z′ = Z
+	    
+	    # Computing Galactocentric radius
+	    R_G = sqrt(X′^2 + Y′^2 + Z′^2)
+	    
+	    # Velocity transformation (assuming linear velocity components)
+	    v_xyz = R * [v_ra, v_dec, v_r]
+	    v_X, v_Y, v_Z = v_xyz
+
+		# Computing orbital velocity (V_phi)
+    	V_phi = (X′ * v_Y - Y′ * v_X) / sqrt(X′^2 + Y′^2)
+	    
+	    return R_G, v_X, v_Y, v_Z, V_phi
+	end
+	
+	# Apply transformation and filter
+	results = [galactocentric_transform(row.ra, row.dec, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity) for row in eachrow(N_filtered)]
+
+	N_filtered[!, :Galactocentric_Radius] = [r[1] for r in results]
+	N_filtered[!, :Vx] = [r[2] for r in results]
+	N_filtered[!, :Vy] = [r[3] for r in results]
+	N_filtered[!, :Vz] = [r[4] for r in results]
+	N_filtered[!, :V_phi] = [r[5] for r in results]  # Orbital velocity
+	
+	N_New = filter(row -> row.Galactocentric_Radius > 0, N_filtered)  # Keeping only positive distances
 end
 
 # ╔═╡ d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
@@ -306,9 +363,27 @@ end
 # ╔═╡ 947e2007-d7e9-4049-b324-0b41d13c80b3
 begin
 	md"""
-	This graph shows us that the orbital velocities of objects about the galactic center are not Keplerian. Nor does the data here indicate a linear relationship!
+	Now there is something still wrong with our data plot. We must realize that our calculation of True Velocity was quite simplified and, infact, incorrect.
+
+	Gaia, our source, does not correct for the orbital velocity of our sun and the solar system. This means, in our frame of reference, all the stars within our neighborhood with similar velocities seem to move with near-zero velocities. 
+
+	This explains why we see so many stars with ~ 0 km/s velocities as the majority of the stars Gaia would observe would be the ones near our own star.
+
+	We must now find a way to correct our data, particularly by shifting the rest frame to the Galactic Center and have our independant value of Distance be Galactocentric Radius instead!
+	
 	"""
 end
+
+# ╔═╡ 58c42bec-6967-4023-8d52-eea5376ec0b8
+begin
+	md"""
+	# Translating our data to a Galactocentric Rest Frame
+	"""
+end
+
+# ╔═╡ 059cb579-672a-4ff9-9477-c3decc2c785e
+scatter(N_filtered.Galactocentric_Radius, N_filtered.V_phi.+220, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=:topright)
+
 
 # ╔═╡ 81f8893e-4c4b-4318-8e3d-70259cf4e044
 begin
@@ -446,9 +521,7 @@ begin
 	V_total_curve = sqrt.(V_bulge_curve.^2 + V_disk_curve.^2 + V_HI_curve.^2 + V_H2_curve.^2 + V_halo_curve.^2)
 	
 	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
-	scatter(N_filtered.distance_kpc, N_filtered.true_velocity, 
-	        yerr=N_filtered.true_velocity_error, xlabel="Distance (kpc)", ylabel="True Velocity (km/s)", 
-	        title="Velocity vs Distance", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 1000))
+	scatter(N_filtered.Galactocentric_Radius, N_filtered.V_phi .+ 220, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 500))
 	
 	# Overlay the rotation curve components and the total curve
 	plot!(r, V_bulge_curve, label="Bulge", color=:blue, linewidth=2)
@@ -463,8 +536,9 @@ begin
 	ylabel!("True Velocity (km/s)")
 	title!("Velocity vs Distance")
 	xlims!(0, xmax_2)
-	ylims!(0, 1000)
+	ylims!(0, 500)
 end
+
 
 # ╔═╡ e03f5d0e-5f31-45a2-aaa1-1e30003a7eca
 begin
@@ -529,6 +603,9 @@ end
 # ╟─f96a61ab-2506-4915-b975-4713534f4250
 # ╟─8e2b556d-aa78-4993-adad-f8c9d0fe6901
 # ╟─947e2007-d7e9-4049-b324-0b41d13c80b3
+# ╟─58c42bec-6967-4023-8d52-eea5376ec0b8
+# ╟─c6d7fed2-e29b-4396-9d19-c07e96a02bd9
+# ╟─059cb579-672a-4ff9-9477-c3decc2c785e
 # ╟─81f8893e-4c4b-4318-8e3d-70259cf4e044
 # ╟─9f4404c3-ca98-4be7-9c8f-187ff582250e
 # ╟─97e6ab22-be14-4b2a-9032-f5432839ac23
@@ -536,4 +613,4 @@ end
 # ╟─e03f5d0e-5f31-45a2-aaa1-1e30003a7eca
 # ╟─6b1f254e-9926-40af-b1b9-4a30603ff595
 # ╟─729d9763-c8ca-4c2d-b208-33373bf66bf5
-# ╟─e25a61ff-03e8-4cd4-bec2-52a00834b011
+# ╠═e25a61ff-03e8-4cd4-bec2-52a00834b011

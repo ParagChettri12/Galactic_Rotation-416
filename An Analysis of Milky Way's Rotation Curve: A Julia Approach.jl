@@ -28,11 +28,71 @@ begin
 	    "Plots"])
 end
 
+# ╔═╡ 103b6c4c-a50c-4c61-8499-d78df265fae1
+begin
+	using PlutoUI
+	md"""
+	**Adjust X-Axis Scale (View Window)  
+	Max R (kpc):** $(@bind xmax Slider(0:1:50; default=25, show_value=true))
+	
+	Galactic Enclosed Mass / Solar Masses:** $(@bind mass_slider Slider(1e10:1e10:1e12, show_value=true, default=1e11))
+		"""
+end
+
+# ╔═╡ d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
+md"""
+#### Parag Chettri ~ Santiago Berumen ~ Isaac Whitson
+# An Analysis of Milky Way's Rotation Curve: A Julia Approach
+## Data from Gaia DR 2
+"""
+
+# ╔═╡ f09fd8c0-416b-4f95-b107-a29a1b7cb3d1
+begin
+
+    md"""
+    ### Select a Dataset
+
+    Choose the dataset you'd like to use (numbers 1-5 only): $(@bind x TextField())
+
+
+   
+   
+    ##### Confirm dataset selection
+
+    Confirm dataset selection: $(@bind confirm_checkbox CheckBox(default=false))
+    """
+end 
+ 
+
+# ╔═╡ ab16d475-a6bf-4dec-8d65-caf44c7bd4ae
+begin
+x_int = tryparse(Int, x)
+
+    if x_int !== nothing && 1 ≤ x_int ≤ 5
+        file_path = "DataSets/TwentyK$(x_int).csv"
+        msg = "You have selected file: **$file_path**"
+    else
+        file_path = nothing
+        msg = "This file does not exist, please choose a different number."
+    end
+
+    # If the checkbox is checked, confirm the dataset is selected
+    if confirm_checkbox
+        msg *= "You have confirmed the dataset selection."
+    else
+        msg *= "Please confirm your selection using the checkbox."
+    end
+
+    # Display the message with the result
+    md"""
+    $msg
+    """
+end
+
 # ╔═╡ 0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 begin
 	using CSV, DataFrames
 	
-	file_path = "DataSets/TwentyKTWO.csv"
 	
 	# Load the Gaia data
 	df = CSV.read(file_path, DataFrame)
@@ -118,17 +178,6 @@ begin
 	N_New = filter(row -> row.Galactocentric_Radius > 0, N)  # Keeping only positive distances
 end
 
-# ╔═╡ 103b6c4c-a50c-4c61-8499-d78df265fae1
-begin
-	using PlutoUI
-	md"""
-	**Adjust X-Axis Scale (View Window)  
-	Max R (kpc):** $(@bind xmax Slider(0:1:50; default=25, show_value=true))
-	
-	Galactic Enclosed Mass / Solar Masses:** $(@bind mass_slider Slider(1e10:1e10:1e12, show_value=true, default=1e11))
-		"""
-end
-
 # ╔═╡ 059cb579-672a-4ff9-9477-c3decc2c785e
 begin
 	using Plots
@@ -148,13 +197,6 @@ begin
 	
 	plot!(r_values, v_kepler, label="Keplerian Curve", legend = true, linewidth=2, color=:red)
 end
-
-# ╔═╡ d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
-md"""
-#### Parag Chettri ~ Santiago Berumen ~ Isaac Whitson
-# An Analysis of Milky Way's Rotation Curve: A Julia Approach
-## Data from Gaia DR 2
-"""
 
 # ╔═╡ 8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
 begin
@@ -624,6 +666,8 @@ end
 
 # ╔═╡ Cell order:
 # ╟─d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
+# ╟─f09fd8c0-416b-4f95-b107-a29a1b7cb3d1
+# ╟─ab16d475-a6bf-4dec-8d65-caf44c7bd4ae
 # ╟─0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 # ╟─8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
 # ╟─d3c12dbb-0fc1-4d31-bf5e-5812c5e51fb8

@@ -52,7 +52,7 @@ begin
     md"""
     ### Select a Dataset
 
-    Choose the dataset you'd like to use (numbers 1-5 only): $(@bind x TextField())
+    Choose the dataset you'd like to use (numbers 1-5 only): $(@bind x TextField(default="1"))
 
 
    
@@ -167,7 +167,8 @@ begin
 	end
 	
 	# Apply transformation and filter
-	results = [galactocentric_transform(row.ra, row.dec, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity) for row in eachrow(N)]
+	results = map(row -> galactocentric_transform(row.ra, row.dec, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity), eachrow(N))
+
 
 	N[!, :Galactocentric_Radius] = [r[1] for r in results]
 	N[!, :Vx] = [r[2] for r in results]
@@ -261,11 +262,20 @@ begin
 	"""
 end
 
+# ╔═╡ 59113f1c-5298-4eac-b3d5-7c54bc311e36
+begin
+	N[!, :distance_kpc_error] = 1.0 ./ N.parallax_error
+	N[!, :distance_kpc] = 1.0 ./ N.parallax
+end
+
 # ╔═╡ 0f93be8e-c045-4cba-8755-44bf01faad1e
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 	N.distance_kpc_error = 1.0 ./ (N.parallax_error)
 	N.distance_kpc = 1.0 ./ N.parallax
 end
+  ╠═╡ =#
 
 # ╔═╡ 26c44b6e-0e5a-47d1-a2d8-52cdc8a8b3f9
 begin
@@ -293,7 +303,17 @@ begin
 	"""
 end
 
+# ╔═╡ 28a49599-56dc-48b5-bafc-b7ed456e3e2d
+begin
+	N[!, :proper_motion] = sqrt.(N.pmra.^2 .+ N.pmdec.^2)
+	N[!, :proper_motion_error] = sqrt.(N.pmra_error.^2 .+ N.pmdec_error.^2)
+	N[!, :tangential_velocity_error] = 4.74 .* N.proper_motion_error .* 	N.distance_kpc_error
+	N[!, :tangential_velocity] = 4.74 .* N.proper_motion .* N.distance_kpc
+end
+
 # ╔═╡ ae23b057-cb23-408f-801d-db86b29ce617
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 	# Compute total proper motion in mas/yr
     N.proper_motion = sqrt.(N.pmra.^2 .+ N.pmdec.^2)
@@ -303,6 +323,7 @@ begin
 	N.tangential_velocity = 4.74 .* N.proper_motion .* N.distance_kpc
 
 end
+  ╠═╡ =#
 
 # ╔═╡ 5580ffda-b8fa-4504-830e-588c91bcdbda
 begin
@@ -337,10 +358,10 @@ end
 
 # ╔═╡ db27aa1b-23da-4ace-bfda-9a34ecf4554a
 begin
- # Compute true velocity (km/s), filtering out missing radial velocities
-	N.true_velocity_error = sqrt.(N.tangential_velocity_error.^2 .+ coalesce.(N.radial_velocity_error, 0.0).^2)
-	N.tangential_velocity_corrected = N.tangential_velocity
-	N.true_velocity = sqrt.(N.tangential_velocity_corrected.^2 .+ coalesce.(N.radial_velocity, 0.0).^2)
+    # Compute true velocity (km/s), filtering out missing radial velocities
+    N[!, :true_velocity_error] = sqrt.(N.tangential_velocity_error.^2 .+ coalesce.(N.radial_velocity_error, 0.0).^2)
+    N[!, :tangential_velocity_corrected] = N.tangential_velocity
+    N[!, :true_velocity] = sqrt.(N.tangential_velocity_corrected.^2 .+ coalesce.(N.radial_velocity, 0.0).^2)
 end
 
 # ╔═╡ 947e2007-d7e9-4049-b324-0b41d13c80b3
@@ -668,14 +689,16 @@ end
 # ╟─d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
 # ╟─f09fd8c0-416b-4f95-b107-a29a1b7cb3d1
 # ╟─ab16d475-a6bf-4dec-8d65-caf44c7bd4ae
-# ╟─0b0fbb27-6b38-4ab7-8b14-18a3023698b6
+# ╠═0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 # ╟─8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
 # ╟─d3c12dbb-0fc1-4d31-bf5e-5812c5e51fb8
 # ╟─bceadb12-7d88-4a8b-aae0-a696366627ce
-# ╟─0f93be8e-c045-4cba-8755-44bf01faad1e
+# ╠═59113f1c-5298-4eac-b3d5-7c54bc311e36
+# ╠═0f93be8e-c045-4cba-8755-44bf01faad1e
 # ╟─26c44b6e-0e5a-47d1-a2d8-52cdc8a8b3f9
 # ╟─37675bef-ab4b-4b7a-a946-102148c6dce6
-# ╟─ae23b057-cb23-408f-801d-db86b29ce617
+# ╠═28a49599-56dc-48b5-bafc-b7ed456e3e2d
+# ╠═ae23b057-cb23-408f-801d-db86b29ce617
 # ╟─5580ffda-b8fa-4504-830e-588c91bcdbda
 # ╟─4cb64ec9-4c1c-47ec-857d-45e764df2e56
 # ╟─db27aa1b-23da-4ace-bfda-9a34ecf4554a

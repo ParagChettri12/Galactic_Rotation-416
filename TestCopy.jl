@@ -16,6 +16,19 @@ macro bind(def, element)
     #! format: on
 end
 
+# ╔═╡ 0b0fbb27-6b38-4ab7-8b14-18a3023698b6
+begin
+	#hideall
+	using CSV
+	using DataFrames
+	file_path = "DataSets/Job1743628405968O-result.csv"
+	# Load the Gaia data
+	df = CSV.read(file_path, DataFrame)
+	# Drop rows with missing RA or Dec values
+	df1 = dropmissing(df, [:ra, :dec]) 
+
+end
+
 # ╔═╡ 103b6c4c-a50c-4c61-8499-d78df265fae1
 begin
 	using PlutoUI
@@ -82,6 +95,8 @@ end
   ╠═╡ =#
 
 # ╔═╡ ab16d475-a6bf-4dec-8d65-caf44c7bd4ae
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 x_int = tryparse(Int, x)
 
@@ -105,47 +120,34 @@ x_int = tryparse(Int, x)
     $msg
     """
 end
+  ╠═╡ =#
 
-# ╔═╡ 0b0fbb27-6b38-4ab7-8b14-18a3023698b6
+# ╔═╡ a9927068-c517-4457-9394-823c8bdbeba4
 begin
-	using CSV
-	using DataFrames
+	md"""
+	### QUERY
+	
+	SELECT TOP 100000 source_id, ra, dec, l, b, parallax, radial_velocity, 
+       pmra, pmdec, parallax_error, radial_velocity_error, pmra_error, pmdec_error
+	FROM gaiadr2.gaia_source
+	WHERE radial_velocity IS NOT NULL
+	  AND parallax IS NOT NULL
+	  AND pmra IS NOT NULL
+	  AND pmdec IS NOT NULL
+	  AND parallax_error IS NOT NULL
+	  AND radial_velocity_error IS NOT NULL
+	  AND pmra_error IS NOT NULL
+	  AND pmdec_error IS NOT NULL
+	  AND ABS(b) < 2.5;
 
-	
-	# Load the Gaia data
-	df = CSV.read(file_path, DataFrame)
-	# Drop rows with missing RA or Dec values
-	df1 = dropmissing(df, [:ra, :dec])
-	
-	# Define the function to filter stars based on their proximity to the Galactic plane
-	function filter_galactic_plane(df1; threshold=2.5)
-	    # Convert RA and Dec to radians
-	    ra_rad = deg2rad.(df1.ra)
-	    dec_rad = deg2rad.(df1.dec)
-	
-	    # Galactic north pole coordinates in radians
-	    ra_gp = deg2rad(192.8595)
-	    dec_gp = deg2rad(27.1284)
-	
-	    # Compute sin(b)
-	    sin_b = sin.(dec_rad) .* sin(dec_gp) .+ cos.(dec_rad) .* cos(dec_gp) .* cos.(ra_rad .- ra_gp)
-	
-	    # Compute Galactic latitude b in degrees
-	    b = rad2deg.(asin.(sin_b))
-	
-	    # Filter stars near the Galactic plane (|b| < threshold)
-	    return df1[abs.(b) .< threshold, :]
-	end
-	
-	# Apply filtering: only stars with non-missing parallax, positive parallax, and proper motions
-	filtered_df = filter_galactic_plane(df1)
+	"""
 end
-
 
 # ╔═╡ 36b65f5b-f767-48fd-a43a-0da33ca35f59
 begin
 	# Further filtering for stars with non-missing parallax, pmra, and pmdec
-		N = filter(row -> !ismissing(row.parallax) && row.parallax > 0 && !ismissing(row.pmra) && !ismissing(row.pmdec), filtered_df)
+
+		N = filter(row -> !ismissing(row.parallax) && row.parallax > 0 && !ismissing(row.pmra) && !ismissing(row.pmdec) && abs(row.b) < 5, df1)
 		N[!, :distance_kpc_error] = 1.0 ./ N.parallax_error
 		N[!, :distance_kpc] = 1.0 ./ N.parallax
 		N[!, :proper_motion] = sqrt.(N.pmra.^2 .+ N.pmdec.^2)
@@ -597,37 +599,48 @@ begin
 end
 
 # ╔═╡ 4715974e-c49a-4a64-b0a5-f0f6429f6c47
-	function galactocentric_transform(ra, dec, d, v_ra, v_dec, v_r)
-	    # Convert to radians
-	    α = deg2rad(ra)
-	    δ = deg2rad(dec)
-	    
-	    # Convert Equatorial to Cartesian coordinates relative to Sun
-	    x = d * cos(δ) * cos(α)
-	    y = d * cos(δ) * sin(α)
-	    z = d * sin(δ)
-	    
-	    # Rotation matrix from Equatorial to Galactic coordinates
-	    R = [-0.05487556 -0.87343709 -0.48383502;
-	         +0.49410943 -0.44482963 +0.74698224;
-	         -0.86766615 -0.19807637 +0.45598378]
-	    
-	    # Galactic Cartesian coordinates relative to Sun
-	    galactic_coords = R * [x, y, z]
-	    X, Y, Z = galactic_coords
-	    
-	    # Compute Galactocentric radius (ensure it's in kpc)
-	    R_G = sqrt(X^2 + Y^2 + Z^2)  # kpc
-	    
-	    # Velocity transformation
-	    v_xyz = R * [v_ra, v_dec, v_r]
-	    v_X, v_Y, v_Z = v_xyz
-	    
-	    # Compute orbital velocity (V_phi in the Galactic plane)
-	    V_phi = (X * v_Y - Y * v_X) / sqrt(X^2 + Y^2)
-	    
-	    return R_G, v_X, v_Y, v_Z, V_phi
-	end
+function galactocentric_transform(ra, dec, d, pm_ra, pm_dec, v_r)
+    # Convert angles to radians
+    α = deg2rad(ra)
+    δ = deg2rad(dec)
+
+    # Convert Equatorial to Cartesian coordinates relative to Sun (in kpc)
+    x = d * cos(δ) * cos(α)
+    y = d * cos(δ) * sin(α)
+    z = d * sin(δ)
+
+    # Rotation matrix from Equatorial to Galactic coordinates
+    R = [-0.05487556 -0.87343709 -0.48383502;
+         +0.49410943 -0.44482963 +0.74698224;
+         -0.86766615 -0.19807637 +0.45598378]
+
+    # Galactic Cartesian coordinates relative to Sun
+    galactic_coords = R * [x, y, z]
+    X, Y, Z = galactic_coords
+
+    # Compute Galactocentric radius (ensuring it's in kpc)
+    R_G = sqrt(X^2 + Y^2 + Z^2)
+
+    # Proper motion conversion (pm_ra, pm_dec in mas/yr)
+    # Convert to transverse velocity in km/s
+    v_T = 4.74 * d * sqrt(pm_ra^2 + pm_dec^2)  # km/s
+
+    # Compute velocity components in Cartesian form
+    v_x = -v_T * sin(α) + v_r * cos(δ) * cos(α)
+    v_y = v_T * cos(α) + v_r * cos(δ) * sin(α)
+    v_z = v_r * sin(δ)
+
+    # Transform velocity to Galactic coordinates
+    v_xyz = R * [v_x, v_y, v_z]
+    v_X, v_Y, v_Z = v_xyz
+
+    # Compute orbital velocity in the Galactic plane (V_phi)
+    R_cyl = sqrt(X^2 + Y^2)  # Cylindrical radius in kpc
+    V_phi = (X * v_Y - Y * v_X) / R_cyl
+
+    return R_G, v_X, v_Y, v_Z, V_phi
+end
+
 
 # ╔═╡ 5379f512-57ba-4247-bcc5-89d346177bca
 begin
@@ -724,7 +737,7 @@ begin
 	V_total_curve = sqrt.(V_bulge_curve.^2 + V_disk_curve.^2 + V_HI_curve.^2 + V_H2_curve.^2 + V_halo_curve.^2)
 	
 	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi .+ 220, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 500))
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 500))
 	
 	# Overlay the rotation curve components and the total curve
 	plot!(r, V_bulge_curve, label="Bulge", color=:blue, linewidth=2)
@@ -2051,6 +2064,7 @@ version = "1.4.1+2"
 # ╟─21841a07-4cb7-4c08-ba43-78cf6feca25a
 # ╟─050fbb3b-61b4-492d-b988-798c1d75e2cb
 # ╟─ab16d475-a6bf-4dec-8d65-caf44c7bd4ae
+# ╠═a9927068-c517-4457-9394-823c8bdbeba4
 # ╠═0b0fbb27-6b38-4ab7-8b14-18a3023698b6
 # ╠═36b65f5b-f767-48fd-a43a-0da33ca35f59
 # ╟─8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
@@ -2071,7 +2085,7 @@ version = "1.4.1+2"
 # ╟─58c42bec-6967-4023-8d52-eea5376ec0b8
 # ╟─8ee908d3-f28e-4146-8a10-811fde6938cc
 # ╠═7aa8b082-5642-474b-99aa-6279573f4102
-# ╟─5379f512-57ba-4247-bcc5-89d346177bca
+# ╠═5379f512-57ba-4247-bcc5-89d346177bca
 # ╟─52be580b-0add-4c32-aba1-719b5898c5fa
 # ╟─ddd1d5c6-cbfd-48e4-89b4-bfb3767d7c14
 # ╟─fcbbfa5d-bbf3-480b-b1b0-c4b835525113
@@ -2080,7 +2094,7 @@ version = "1.4.1+2"
 # ╟─2b7a8b7e-a6d1-4360-b155-54c1bc771ee1
 # ╟─81f8893e-4c4b-4318-8e3d-70259cf4e044
 # ╟─9f4404c3-ca98-4be7-9c8f-187ff582250e
-# ╠═97e6ab22-be14-4b2a-9032-f5432839ac23
+# ╟─97e6ab22-be14-4b2a-9032-f5432839ac23
 # ╟─3e5f61b8-edbc-41b2-a047-0656bf419bdb
 # ╟─057a643b-128e-461e-9697-8b8344ce6331
 # ╠═6b1f254e-9926-40af-b1b9-4a30603ff595

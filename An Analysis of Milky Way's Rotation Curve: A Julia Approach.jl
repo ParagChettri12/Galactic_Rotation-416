@@ -154,77 +154,6 @@ begin
 		N[!, :tangential_velocity] = 4.74 .* N.proper_motion .* N.distance_kpc
 end
 
-# ╔═╡ c6d7fed2-e29b-4396-9d19-c07e96a02bd9
-begin
-	using LinearAlgebra
-	# Constants
-	
-	# Function to convert RA, Dec, d to Galactocentric radius and velocities
-	function galactocentric_transform(ra, dec, d, v_ra, v_dec, v_r)
-	    # Convert to radians
-	    α = deg2rad(ra)
-	    δ = deg2rad(dec)
-	    
-	    # Convert Equatorial to Cartesian coordinates relative to Sun
-	    x = d * cos(δ) * cos(α)
-	    y = d * cos(δ) * sin(α)
-	    z = d * sin(δ)
-	    
-	    # Rotation matrix from Equatorial to Galactic coordinates
-	    R = [-0.05487556 -0.87343709 -0.48383502;
-	         +0.49410943 -0.44482963 +0.74698224;
-	         -0.86766615 -0.19807637 +0.45598378]
-	    
-	    # Galactic Cartesian coordinates relative to Sun
-	    galactic_coords = R * [x, y, z]
-	    X, Y, Z = galactic_coords
-	    
-	    # Compute Galactocentric radius (ensure it's in kpc)
-	    R_G = sqrt(X^2 + Y^2 + Z^2)  # kpc
-	    
-	    # Velocity transformation
-	    v_xyz = R * [v_ra, v_dec, v_r]
-	    v_X, v_Y, v_Z = v_xyz
-	    
-	    # Compute orbital velocity (V_phi in the Galactic plane)
-	    V_phi = (X * v_Y - Y * v_X) / sqrt(X^2 + Y^2)
-	    
-	    return R_G, v_X, v_Y, v_Z, V_phi
-	end
-	
-	# Apply transformation and filter
-	results = map(row -> galactocentric_transform(row.ra, row.dec, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity), eachrow(N))
-
-
-	N[!, :Galactocentric_Radius] = [r[1] for r in results]
-	N[!, :Vx] = [r[2] for r in results]
-	N[!, :Vy] = [r[3] for r in results]
-	N[!, :Vz] = [r[4] for r in results]
-	N[!, :V_phi] = [r[5] for r in results]  # Orbital velocity
-	
-	N_New = filter(row -> row.Galactocentric_Radius > 0, N)  # Keeping only positive distances
-end
-
-# ╔═╡ 059cb579-672a-4ff9-9477-c3decc2c785e
-begin
-	using Plots
-	
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi.+220, marker=:circle, xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=true, label="Observed Object", xlims=(0, xmax), ylims=(0, 500))
-
-	G = 4.302e-6  # kpc * (km/s)^2 / Msun
-	
-	keplerian_velocity(r, M) = sqrt(G * M / r)
-	
-	
-	### Galactic rotation curve
-	r_values = 0.1:0.1:xmax # Range of distances (kpc)
-	v_kepler = keplerian_velocity.(r_values, mass_slider)  # Keplerian velocity based on current mass
-	
-	### Generating scatter plot and overlaying Keplerian curve
-	
-	plot!(r_values, v_kepler, label="Keplerian Curve", legend = true, linewidth=2, color=:red)
-end
-
 # ╔═╡ 8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
 begin
 	md"""
@@ -499,6 +428,9 @@ begin
 
 end
 
+# ╔═╡ 7aa8b082-5642-474b-99aa-6279573f4102
+
+
 # ╔═╡ 52be580b-0add-4c32-aba1-719b5898c5fa
 begin
 	md"""
@@ -619,6 +551,124 @@ begin
 	"""
 end
 
+# ╔═╡ 057a643b-128e-461e-9697-8b8344ce6331
+begin
+	md"""
+	**Why are there so many data points between 0 and 7 kpc?**
+	
+	The answer: The galactic center bulge is dense with stars and we are about 8 kpc from the center of the galaxy.
+	"""
+end
+
+# ╔═╡ 6b1f254e-9926-40af-b1b9-4a30603ff595
+begin
+	md"""
+	# NEXT STEPS
+
+	Parag - Fitted the Data with Swag
+
+	Santi - TwentyK[NUMBER] files. Make this user-selectable.
+
+	Isaac - List all statistical things from the labs which we can use here.
+
+	
+	
+	"""
+end
+
+# ╔═╡ 729d9763-c8ca-4c2d-b208-33373bf66bf5
+begin
+	md"""
+	
+	### **Citations**
+
+
+	
+	[Ueshima, K. (2010). Study of pulse shape discrimination and low background techniques for liquid xenon dark matter detectors. Department of Physics, School of Science, University of Tokyo.](https://www-sk.icrr.u-tokyo.ac.jp/xmass/publist/ueshima_PhD.pdf)
+
+	"""
+end
+
+# ╔═╡ a692eefa-ef88-4132-9f25-e92937c22534
+begin
+	md"""
+	# Helper Functions
+	"""
+end
+
+# ╔═╡ 4715974e-c49a-4a64-b0a5-f0f6429f6c47
+	function galactocentric_transform(ra, dec, d, v_ra, v_dec, v_r)
+	    # Convert to radians
+	    α = deg2rad(ra)
+	    δ = deg2rad(dec)
+	    
+	    # Convert Equatorial to Cartesian coordinates relative to Sun
+	    x = d * cos(δ) * cos(α)
+	    y = d * cos(δ) * sin(α)
+	    z = d * sin(δ)
+	    
+	    # Rotation matrix from Equatorial to Galactic coordinates
+	    R = [-0.05487556 -0.87343709 -0.48383502;
+	         +0.49410943 -0.44482963 +0.74698224;
+	         -0.86766615 -0.19807637 +0.45598378]
+	    
+	    # Galactic Cartesian coordinates relative to Sun
+	    galactic_coords = R * [x, y, z]
+	    X, Y, Z = galactic_coords
+	    
+	    # Compute Galactocentric radius (ensure it's in kpc)
+	    R_G = sqrt(X^2 + Y^2 + Z^2)  # kpc
+	    
+	    # Velocity transformation
+	    v_xyz = R * [v_ra, v_dec, v_r]
+	    v_X, v_Y, v_Z = v_xyz
+	    
+	    # Compute orbital velocity (V_phi in the Galactic plane)
+	    V_phi = (X * v_Y - Y * v_X) / sqrt(X^2 + Y^2)
+	    
+	    return R_G, v_X, v_Y, v_Z, V_phi
+	end
+
+# ╔═╡ 5379f512-57ba-4247-bcc5-89d346177bca
+begin
+	using LinearAlgebra
+	# Constants
+	
+	# Function to convert RA, Dec, d to Galactocentric radius and velocities
+
+	# Apply transformation and filter
+	results = map(row -> galactocentric_transform(row.ra, row.dec, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity), eachrow(N))
+
+
+	N[!, :Galactocentric_Radius] = [r[1] for r in results]
+	N[!, :Vx] = [r[2] for r in results]
+	N[!, :Vy] = [r[3] for r in results]
+	N[!, :Vz] = [r[4] for r in results]
+	N[!, :V_phi] = [r[5] for r in results]  # Orbital velocity
+	
+	N_New = filter(row -> row.Galactocentric_Radius > 0, N)  # Keeping only positive distances
+end
+
+# ╔═╡ 059cb579-672a-4ff9-9477-c3decc2c785e
+begin
+	using Plots
+	
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi.+220, marker=:circle, xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=true, label="Observed Object", xlims=(0, xmax), ylims=(0, 500))
+
+	G = 4.302e-6  # kpc * (km/s)^2 / Msun
+	
+	keplerian_velocity(r, M) = sqrt(G * M / r)
+	
+	
+	### Galactic rotation curve
+	r_values = 0.1:0.1:xmax # Range of distances (kpc)
+	v_kepler = keplerian_velocity.(r_values, mass_slider)  # Keplerian velocity based on current mass
+	
+	### Generating scatter plot and overlaying Keplerian curve
+	
+	plot!(r_values, v_kepler, label="Keplerian Curve", legend = true, linewidth=2, color=:red)
+end
+
 # ╔═╡ 97e6ab22-be14-4b2a-9032-f5432839ac23
 begin
 	
@@ -693,45 +743,7 @@ begin
 end
 
 
-# ╔═╡ 057a643b-128e-461e-9697-8b8344ce6331
-begin
-	md"""
-	**Why are there so many data points between 0 and 7 kpc?**
-	
-	The answer: The galactic center bulge is dense with stars and we are about 8 kpc from the center of the galaxy.
-	"""
-end
-
-# ╔═╡ 6b1f254e-9926-40af-b1b9-4a30603ff595
-begin
-	md"""
-	# NEXT STEPS
-
-	Parag - Fitted the Data with Swag
-
-	Santi - TwentyK[NUMBER] files. Make this user-selectable.
-
-	Isaac - List all statistical things from the labs which we can use here.
-
-	
-	
-	"""
-end
-
-# ╔═╡ 729d9763-c8ca-4c2d-b208-33373bf66bf5
-begin
-	md"""
-	
-	### **Citations**
-
-
-	
-	[Ueshima, K. (2010). Study of pulse shape discrimination and low background techniques for liquid xenon dark matter detectors. Department of Physics, School of Science, University of Tokyo.](https://www-sk.icrr.u-tokyo.ac.jp/xmass/publist/ueshima_PhD.pdf)
-
-	"""
-end
-
-# ╔═╡ 4715974e-c49a-4a64-b0a5-f0f6429f6c47
+# ╔═╡ cab52545-97ed-4f3c-bbab-6e8797e5721e
 
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -2058,20 +2070,23 @@ version = "1.4.1+2"
 # ╟─947e2007-d7e9-4049-b324-0b41d13c80b3
 # ╟─58c42bec-6967-4023-8d52-eea5376ec0b8
 # ╟─8ee908d3-f28e-4146-8a10-811fde6938cc
-# ╟─c6d7fed2-e29b-4396-9d19-c07e96a02bd9
+# ╠═7aa8b082-5642-474b-99aa-6279573f4102
+# ╟─5379f512-57ba-4247-bcc5-89d346177bca
 # ╟─52be580b-0add-4c32-aba1-719b5898c5fa
 # ╟─ddd1d5c6-cbfd-48e4-89b4-bfb3767d7c14
 # ╟─fcbbfa5d-bbf3-480b-b1b0-c4b835525113
-# ╟─059cb579-672a-4ff9-9477-c3decc2c785e
+# ╠═059cb579-672a-4ff9-9477-c3decc2c785e
 # ╟─103b6c4c-a50c-4c61-8499-d78df265fae1
 # ╟─2b7a8b7e-a6d1-4360-b155-54c1bc771ee1
 # ╟─81f8893e-4c4b-4318-8e3d-70259cf4e044
 # ╟─9f4404c3-ca98-4be7-9c8f-187ff582250e
-# ╟─97e6ab22-be14-4b2a-9032-f5432839ac23
+# ╠═97e6ab22-be14-4b2a-9032-f5432839ac23
 # ╟─3e5f61b8-edbc-41b2-a047-0656bf419bdb
 # ╟─057a643b-128e-461e-9697-8b8344ce6331
-# ╟─6b1f254e-9926-40af-b1b9-4a30603ff595
+# ╠═6b1f254e-9926-40af-b1b9-4a30603ff595
 # ╟─729d9763-c8ca-4c2d-b208-33373bf66bf5
+# ╟─a692eefa-ef88-4132-9f25-e92937c22534
 # ╠═4715974e-c49a-4a64-b0a5-f0f6429f6c47
+# ╠═cab52545-97ed-4f3c-bbab-6e8797e5721e
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

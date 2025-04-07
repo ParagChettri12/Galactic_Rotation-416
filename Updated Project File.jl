@@ -35,26 +35,29 @@ md"""
 """
 
 # ╔═╡ 25699170-0fcd-11f0-2202-772042e9fd47
-begin 
-	md"""
-	### QUERY
-	SELECT TOP 100000 
-	    source_id, ra, dec, l, b, parallax, radial_velocity, 
-	    pmra, pmdec, parallax_error, radial_velocity_error, 
-	    pmra_error, pmdec_error
-	FROM gaiadr2.gaia_source
-	WHERE abs(b) < 2.5
-	    AND radial_velocity IS NOT NULL
-	    AND ra IS NOT NULL
-	    AND dec IS NOT NULL
-	    AND l IS NOT NULL
-	    AND b IS NOT NULL
-	    AND pmra IS NOT NULL
-	    AND pmdec IS NOT NULL
-	    AND source_id IS NOT NULL
-		AND parallax > 0.01
-		AND parallax < 99
-	"""
+begin
+    md"""
+    ### QUERY
+    
+    ```sql
+    SELECT TOP 100000 
+        source_id, ra, dec, l, b, parallax, radial_velocity, 
+        pmra, pmdec, parallax_error, radial_velocity_error, 
+        pmra_error, pmdec_error
+    FROM gaiadr2.gaia_source
+    WHERE abs(b) < 2.5
+        AND radial_velocity IS NOT NULL
+        AND ra IS NOT NULL
+        AND dec IS NOT NULL
+        AND l IS NOT NULL
+        AND b IS NOT NULL
+        AND pmra IS NOT NULL
+        AND pmdec IS NOT NULL
+        AND source_id IS NOT NULL
+        AND parallax > 0.01
+        AND parallax < 99
+    ```
+    """
 end
 
 
@@ -386,15 +389,17 @@ begin
 	"""
 end
 
-# ╔═╡ f5e70656-b4b8-4cb7-bb19-e20d5ff89c00
+# ╔═╡ 711fdcf5-333a-44b9-a821-30cea343d89c
 begin
     md"""
-    Instead, we can understand this as a Newtonian self-interaction disc. One of the possible approximations for this odd flat curve are as follows:
+	
+	A Simple Model
+	Instead, we can understand this as a Newtonian self-interaction disc within minimal parameters. One of the possible approximations for this odd flat curve are as follows:
+	
+	$f(x) = V_{x \to \infty} \left( 1 - e^{-0.6 x} \right) - 0.15$
 
-    $$f(x) = V_{x \to \infty} \left( 1 - e^{-0.6 x} \right) - 0.15$$
     """
 end
-
 
 # ╔═╡ 57fa7cfd-8521-46ca-b2fd-70dc506e2593
 begin
@@ -433,6 +438,72 @@ begin
 end
 
 
+# ╔═╡ 4d4b096d-a87a-482f-a19c-7918e7af47fa
+begin
+	md"""
+	# A Complex Model - The Dark Matter-corrected Milky Way Rotation Curve
+	
+	The total rotation curve of the Milky Way is the quadrature sum of multiple contributions from the bulge, stellar disk, HI layer, H2 layer, and dark halo (a grand total of 9 parameters make up this model):
+	
+	
+	$V_{\text{total}}(r) = \sqrt{V_{\text{bulge}}^2 + V_{\text{disk}}^2 + V_{\text{HI}}^2 + V_{\text{H2}}^2 + V_{\text{halo}}^2}$
+	
+	#### **1. Bulge (Blue Line)**
+	The bulge follows a steep Keplerian-like rise and then quickly levels off:
+	
+	$V_{\text{bulge}}(r) = V_0 \frac{r}{(r^2 + a^2)^{3/4}}$
+	
+	where: $V_0$ is a scaling factor $(~300 km/s)$,
+	where: $a$ is a scale radius $(~0.5–1 kpc)$.
+	
+	#### **2. Stellar Disk (Green Line)**
+	The stellar disk follows an exponential profile:
+	
+	$V_{\text{disk}}(r) = V_0 \left(\frac{r}{R_d}\right) e^{-r/(2 R_d)}$
+	
+	where: $R_d$ is the disk scale length $(~3 kpc)$,
+	where: $V_0$ is a normalization constant $(~200 km/s)$.
+	
+	#### **3. HI Layer (Yellow Line)**
+	Neutral hydrogen contributes at intermediate radii:
+	
+	$V_{\text{HI}}(r) = V_0 \frac{r}{(r^2 + b^2)^{1/2}}$
+	
+	where: $b$ is a scale parameter $(~5 kpc)$,
+	where: $V_0$ is a normalization constant $(~100 km/s)$.
+	
+	#### **4. H2 Layer (Pink Line)**
+	Molecular hydrogen has a localized peak in the inner regions:
+	
+	$V_{\text{H2}}(r) = V_0 r e^{-r/R_{\text{H2}}}$
+	
+	where: $R_{\text{H2}}$ is a characteristic radius $(~4 kpc)$,
+	where: $V_0$ is a normalization factor $(~80 km/s)$.
+	
+	#### **5. Dark Halo (Grey Line)**
+	The dark matter halo is best described using an isothermal sphere model:
+	
+	$V_{\text{halo}}(r) = V_0 \frac{r}{\sqrt{r^2 + c^2}}$
+	
+	or for a nearly flat rotation curve:
+	
+	$V_{\text{halo}}(r) = V_{\infty} \left(1 - e^{-r/R_H}\right)$
+	
+	where: $V_{\infty}$ is the asymptotic velocity $(~220 km/s)$,
+	where: $R_H$ is the halo scale radius $(~20 kpc)$,
+	where: $c$ is a core radius $(~10 kpc)$.
+
+	#### **4. Final Estimation (Black Line)**
+	
+	$V_{\text{total}}(r)$
+
+	This is our final estimation as sum of the given distributions.
+
+	Source: [(Ueshima, 2010)](https://www-sk.icrr.u-tokyo.ac.jp/xmass/publist/ueshima_PhD.pdf)
+	"""
+end
+
+
 # ╔═╡ ab4b6e35-bbd6-4c5d-ae6c-cf3cb2092a85
 begin
 	md"""
@@ -441,79 +512,15 @@ begin
 	"""
 end
 
-# ╔═╡ ddba2999-edab-4899-86d7-44c822e33ac1
+# ╔═╡ d7213a5c-f663-420d-99fd-1ea15758c4bc
 begin
-	
-	# Define the rotation curve components
-	function V_bulge(r, V0, a)
-	    return V0 * (r ./ (r.^2 .+ a^2).^(3/4))
-	end
-	
-	function V_disk(r, V0, R_d)
-	    return V0 * (r ./ R_d) .* exp.(-r ./ (2 * R_d))
-	end
-	
-	function V_HI(r, V0, b)
-	    return V0 * (r ./ (r.^2 .+ b^2).^(1/2))
-	end
-	
-	function V_H2(r, V0, R_H2)
-	    return V0 * r .* exp.(-r ./ R_H2)
-	end
-	
-	function V_halo(r, V0, c)
-	    return V0 * (r ./ sqrt.(r.^2 .+ c^2))
-	end
-	
-	# Define the range of r (distance in kpc)
-	r = 0:0.1:xmax_2  # 0 to user selected value for kpc
-	
-	# Parameters for the components (from the description)
-	V0_bulge = 300
-	a_bulge = 1
-	
-	V0_disk = 200
-	R_d = 3
-	
-	V0_HI = 100
-	b_HI = 5
-	
-	V0_H2 = 80
-	R_H2 = 4
-	
-	V_infinity_halo = 220
-	R_H = 20
-	c_halo = 10
-	
-	# Calculate each component
-	V_bulge_curve = V_bulge(r, V0_bulge, a_bulge)
-	V_disk_curve = V_disk(r, V0_disk, R_d)
-	V_HI_curve = V_HI(r, V0_HI, b_HI)
-	V_H2_curve = V_H2(r, V0_H2, R_H2)
-	V_halo_curve = V_halo(r, V_infinity_halo, c_halo)
-	
-	# Total rotation curve (quadrature sum)
-	V_total_curve = sqrt.(V_bulge_curve.^2 + V_disk_curve.^2 + V_HI_curve.^2 + V_H2_curve.^2 + V_halo_curve.^2)
-	
-	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi.+240, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 500))
-	
-	# Overlay the rotation curve components and the total curve
-	plot!(r, V_bulge_curve, label="Bulge", color=:blue, linewidth=2)
-	plot!(r, V_disk_curve, label="Stellar Disk", color=:green, linewidth=2)
-	plot!(r, V_HI_curve, label="HI Layer", color=:yellow, linewidth=2)
-	plot!(r, V_H2_curve, label="H2 Layer", color=:pink, linewidth=2)
-	plot!(r, V_halo_curve, label="Dark Halo", color=:gray, linewidth=2)
-	plot!(r, V_total_curve, label="Total", color=:black, linewidth=3)
-	
-	# Customize the plot further
-	xlabel!("Galactocentric Radius (kpc)")
-	ylabel!("Orbital Velocity (km/s)")
-	title!("Orbital Velocity vs. Galactocentric Radius")
-	xlims!(0, xmax_2)
-	ylims!(0, 450)
-end
+	md"""
+	# F Tests and P-value
 
+	tests
+
+	"""
+end
 
 # ╔═╡ 93763c84-79f2-4cca-9a97-a871361c92a3
 # ╠═╡ disabled = true
@@ -543,6 +550,13 @@ function f_test_rss(RSS1, RSS2, k1, k2, n)
 end
 
   ╠═╡ =#
+
+# ╔═╡ bc5edd76-7aa4-494c-b78e-2949a032b0a9
+begin
+	md"""
+	# Supporting Functions
+	"""
+end
 
 # ╔═╡ f0807783-6915-49e5-a49f-eb770695b0ce
 begin
@@ -597,9 +611,6 @@ begin
 	end
 end
 
-
-# ╔═╡ 5e980df1-7333-4210-97c1-7aa3f0de9a67
-plot_residuals(N_New, r, V_total_curve)
 
 # ╔═╡ 7f1f1fc5-1077-4f56-94de-6a56521ad0e1
 begin
@@ -686,9 +697,6 @@ function plot_residualsSimple(N_New, r, V_total_curve)
 end
 
 
-# ╔═╡ 1ad1dc9b-f12d-4e9a-8ea8-c3c85ab738c3
-plot_residualsSimple(N_New, r, model)
-
 # ╔═╡ de2c68cb-640c-4fbd-83f8-eb8ef48104c0
 function RSSSimple(N_New, r, V_total_curve)
     # Step 1: Interpolation with linear extrapolation
@@ -719,6 +727,88 @@ function RSSSimple(N_New, r, V_total_curve)
 end
 
 
+# ╔═╡ 54ce63de-9640-4c00-b685-f8163f5f4bd8
+begin
+		
+		function V_disk(r, V0, R_d)
+		    return V0 * (r ./ R_d) .* exp.(-r ./ (2 * R_d))
+		end
+		
+		function V_HI(r, V0, b)
+		    return V0 * (r ./ (r.^2 .+ b^2).^(1/2))
+		end
+		
+		function V_H2(r, V0, R_H2)
+		    return V0 * r .* exp.(-r ./ R_H2)
+		end
+		
+		function V_halo(r, V0, c)
+		    return V0 * (r ./ sqrt.(r.^2 .+ c^2))
+		end
+	
+	 V0_bulge = 300
+		a_bulge = 1
+		
+		V0_disk = 200
+		R_d = 3
+		
+		V0_HI = 100
+		b_HI = 5
+		
+		V0_H2 = 80
+		R_H2 = 4
+		
+		V_infinity_halo = 220
+		R_H = 20
+		c_halo = 10
+		function V_bulge(r, V0, a)
+		    return V0 * (r ./ (r.^2 .+ a^2).^(3/4))
+		end
+end
+
+# ╔═╡ ddba2999-edab-4899-86d7-44c822e33ac1
+begin
+	
+	# Defining the range of r (distance in kpc)
+	r = 0:0.1:xmax_2  # 0 to user selected value for kpc
+	
+	
+	# Calculating each component
+	V_bulge_curve = V_bulge(r, V0_bulge, a_bulge)
+	V_disk_curve = V_disk(r, V0_disk, R_d)
+	V_HI_curve = V_HI(r, V0_HI, b_HI)
+	V_H2_curve = V_H2(r, V0_H2, R_H2)
+	V_halo_curve = V_halo(r, V_infinity_halo, c_halo)
+	
+	# Total rotation curve (quadrature sum)
+	V_total_curve = sqrt.(V_bulge_curve.^2 + V_disk_curve.^2 + V_HI_curve.^2 + V_H2_curve.^2 + V_halo_curve.^2)
+	
+	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi.+240, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 500))
+	
+	# Overlay the rotation curve components and the total curve
+	plot!(r, V_bulge_curve, label="Bulge", color=:blue, linewidth=2)
+	plot!(r, V_disk_curve, label="Stellar Disk", color=:green, linewidth=2)
+	plot!(r, V_HI_curve, label="HI Layer", color=:yellow, linewidth=2)
+	plot!(r, V_H2_curve, label="H2 Layer", color=:pink, linewidth=2)
+	plot!(r, V_halo_curve, label="Dark Halo", color=:gray, linewidth=2)
+	plot!(r, V_total_curve, label="Total", color=:black, linewidth=3)
+	
+	# Customize the plot further
+	xlabel!("Galactocentric Radius (kpc)")
+	ylabel!("Orbital Velocity (km/s)")
+	title!("Orbital Velocity vs. Galactocentric Radius")
+	xlims!(0, xmax_2)
+	ylims!(0, 450)
+end
+
+
+# ╔═╡ 1ad1dc9b-f12d-4e9a-8ea8-c3c85ab738c3
+plot_residualsSimple(N_New, r, model)
+
+# ╔═╡ 5e980df1-7333-4210-97c1-7aa3f0de9a67
+plot_residuals(N_New, r, V_total_curve)
+
 # ╔═╡ 868ae38e-5355-42cf-b645-1ae6d6b443c8
 begin
 	function f_test_rss(RSS1, RSS2, k1, k2, n)
@@ -734,6 +824,7 @@ begin
 	k2 = 9
 	n = 100000
 	F = f_test_rss(RSS1, RSS2,k1, k2, n)
+	println("F stat value of, ", F)
 end
 		
 
@@ -2302,8 +2393,8 @@ version = "1.4.1+2"
 
 # ╔═╡ Cell order:
 # ╟─f269ff32-3e80-4548-97c6-d337827db7aa
-# ╠═25699170-0fcd-11f0-2202-772042e9fd47
-# ╠═80ec79c4-9971-47a2-a884-5417254a31fd
+# ╟─25699170-0fcd-11f0-2202-772042e9fd47
+# ╟─80ec79c4-9971-47a2-a884-5417254a31fd
 # ╟─ee84b436-12a5-4f87-8187-e064574632bb
 # ╟─2a36ce70-5dc5-401d-864e-9b5e479b7913
 # ╟─72bfcd0b-47a4-4535-8a9d-2e059a6e86a1
@@ -2313,29 +2404,33 @@ version = "1.4.1+2"
 # ╟─b07f485a-7168-4d87-acc2-026c1e2b4ad2
 # ╟─34394d4f-5c13-4fa5-977e-1f0aee78dc2c
 # ╟─8c1e2c97-381d-4c3b-af76-e269e46feb8c
-# ╠═2809e246-b104-4bad-b4a8-5153d817274f
+# ╟─2809e246-b104-4bad-b4a8-5153d817274f
 # ╟─0ccfae55-6162-4c97-a04d-2dd3c5d9370e
 # ╟─95432f3f-e4e5-48e4-abc2-522a1af4d402
 # ╟─7d85f4cd-e4e8-4076-afc5-33daf90c08fe
 # ╟─fb84175b-122e-4121-8498-085810627024
 # ╟─3ae662a1-2c66-4810-9770-514cc93897ff
 # ╟─077c4e59-79e9-4108-85c8-cf6e06458394
-# ╟─f5e70656-b4b8-4cb7-bb19-e20d5ff89c00
+# ╠═711fdcf5-333a-44b9-a821-30cea343d89c
 # ╟─bb8551a1-8e35-49a4-8aa8-1fc89167ae7e
 # ╟─57fa7cfd-8521-46ca-b2fd-70dc506e2593
 # ╟─9a619a6a-0814-4c21-a3be-50041c3e198f
 # ╠═1ad1dc9b-f12d-4e9a-8ea8-c3c85ab738c3
+# ╟─4d4b096d-a87a-482f-a19c-7918e7af47fa
 # ╟─ddba2999-edab-4899-86d7-44c822e33ac1
 # ╟─ab4b6e35-bbd6-4c5d-ae6c-cf3cb2092a85
 # ╠═5e980df1-7333-4210-97c1-7aa3f0de9a67
-# ╠═868ae38e-5355-42cf-b645-1ae6d6b443c8
-# ╠═6e0c44d6-af43-4dbd-ab2f-d36053e2559a
+# ╟─d7213a5c-f663-420d-99fd-1ea15758c4bc
+# ╟─868ae38e-5355-42cf-b645-1ae6d6b443c8
+# ╟─6e0c44d6-af43-4dbd-ab2f-d36053e2559a
 # ╠═93763c84-79f2-4cca-9a97-a871361c92a3
 # ╠═f7c435ef-deb8-49b5-8406-ec0b36116aac
+# ╟─bc5edd76-7aa4-494c-b78e-2949a032b0a9
 # ╟─f0807783-6915-49e5-a49f-eb770695b0ce
-# ╠═7f1f1fc5-1077-4f56-94de-6a56521ad0e1
+# ╟─7f1f1fc5-1077-4f56-94de-6a56521ad0e1
 # ╟─f5902359-7f0b-4244-8ebd-191358e3a227
-# ╠═de2c68cb-640c-4fbd-83f8-eb8ef48104c0
-# ╠═dab5f085-ac90-4342-b2eb-60b097320de9
+# ╟─de2c68cb-640c-4fbd-83f8-eb8ef48104c0
+# ╟─54ce63de-9640-4c00-b685-f8163f5f4bd8
+# ╟─dab5f085-ac90-4342-b2eb-60b097320de9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

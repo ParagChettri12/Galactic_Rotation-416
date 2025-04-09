@@ -41,21 +41,26 @@ begin
     
     ```sql
     SELECT TOP 100000 
-        source_id, ra, dec, l, b, parallax, radial_velocity, 
-        pmra, pmdec, parallax_error, radial_velocity_error, 
-        pmra_error, pmdec_error
-    FROM gaiadr2.gaia_source
-    WHERE abs(b) < 2.5
-        AND radial_velocity IS NOT NULL
-        AND ra IS NOT NULL
-        AND dec IS NOT NULL
-        AND l IS NOT NULL
-        AND b IS NOT NULL
-        AND pmra IS NOT NULL
-        AND pmdec IS NOT NULL
-        AND source_id IS NOT NULL
-        AND parallax > 0.01
-        AND parallax < 99
+    	source_id, ra, dec, l, b, parallax, radial_velocity, 
+    	pmra, pmdec, parallax_error, radial_velocity_error, 
+    	pmra_error, pmdec_error
+	FROM gaiadr2.gaia_source
+	WHERE abs(b) < 2.5
+	    AND radial_velocity IS NOT NULL
+	    AND ra IS NOT NULL
+	    AND dec IS NOT NULL
+	    AND l IS NOT NULL
+	    AND b IS NOT NULL
+	    AND pmra IS NOT NULL
+	    AND pmdec IS NOT NULL
+	    AND source_id IS NOT NULL
+	    AND parallax > 0.01
+	    AND parallax < 99
+	    AND (
+	        (l > -5 AND l < 5) 
+	        OR 
+	        (l > 175 AND l < 185)
+	    )
     ```
     """
 end
@@ -64,7 +69,7 @@ end
 # ╔═╡ 80ec79c4-9971-47a2-a884-5417254a31fd
 begin
 	#hideall
-	file_path = "DataSets/1743975571178O-result.csv"
+	file_path = "DataSets/1744209227335O-result.csv"
 	# Load the Gaia data
 	df = CSV.read(file_path, DataFrame);
 	# Drop rows with missing RA or Dec values
@@ -107,13 +112,37 @@ begin
 	
 	As deviation can be positive or negative, we will use the absolute value for $b$ to limit our values.
 	
-	We will choose a value of $b = 2.5^\circ$. (This is reflected in our query as $abs(b) < 2.5
+	We will choose a value of $b = 2.5^\circ$. 
+	
+	(This is reflected in our query as $abs(b) < 2.5
 	"""
 end
 
 # ╔═╡ 2a36ce70-5dc5-401d-864e-9b5e479b7913
 begin
-	N = filter(row -> !ismissing(row.parallax) && row.parallax > 0 && !ismissing(row.pmra) && !ismissing(row.pmdec), df1)
+	function filter_galactic_plane(df1; threshold=2.5)
+	    # Convert RA and Dec to radians
+	    ra_rad = deg2rad.(df1.ra)
+	    dec_rad = deg2rad.(df1.dec)
+	
+	    # Galactic north pole coordinates in radians
+	    ra_gp = deg2rad(192.8595)
+	    dec_gp = deg2rad(27.1284)
+	
+	    # Compute sin(b)
+	    sin_b = sin.(dec_rad) .* sin(dec_gp) .+ cos.(dec_rad) .* cos(dec_gp) .* cos.(ra_rad .- ra_gp)
+	
+	    # Compute Galactic latitude b in degrees
+	    b = rad2deg.(asin.(sin_b))
+	
+	    # Filter stars near the Galactic plane (|b| < threshold)
+	    return df1[abs.(b) .< threshold, :]
+	end
+	
+	# Apply filtering: only stars with non-missing parallax, positive parallax, and proper motions
+	filtered_df = filter_galactic_plane(df1)
+	
+	N = filter(row -> !ismissing(row.parallax) && row.parallax > 0 && !ismissing(row.pmra) && !ismissing(row.pmdec), filtered_df)
 end
 
 
@@ -278,54 +307,59 @@ end
 
 # ╔═╡ 0ccfae55-6162-4c97-a04d-2dd3c5d9370e
 begin
-	# Constants
+	function compute_galactocentric_kinematics(ra, dec, l, b, d_kpc, pmra_masyr, pmdec_masyr, v_r_kms)
+	    # Constants
+	    R_0 = 8.5  # kpc
+	    Θ_0 = 220.0  # km/s (Galactic rotation at Sun)
+	    U_sun, V_sun, W_sun = 11.1, 12.24, 7.25  # km/s
 	
-	# Function to convert RA, Dec, d to Galactocentric radius and velocities
-	function galactocentric_transform(ra, dec, d, v_ra, v_dec, v_r)
-	    # Convert to radians
-	    α = deg2rad(ra)
-	    δ = deg2rad(dec)
-	    
-	    # Convert Equatorial to Cartesian coordinates relative to Sun
-	    x = d * cos(δ) * cos(α)
-	    y = d * cos(δ) * sin(α)
-	    z = d * sin(δ)
-	    
-	    # Rotation matrix from Equatorial to Galactic coordinates
-	    R = [-0.05487556 -0.87343709 -0.48383502;
-	         +0.49410943 -0.44482963 +0.74698224;
-	         -0.86766615 -0.19807637 +0.45598378]
-	    
-	    # Galactic Cartesian coordinates relative to Sun
-	    galactic_coords = R * [x, y, z]
-	    X, Y, Z = galactic_coords
-	    
-	    # Compute Galactocentric radius (ensure it's in kpc)
-	    R_G = sqrt(X^2 + Y^2 + Z^2)  # kpc
-	    
-	    # Velocity transformation
-	    v_xyz = R * [v_ra, v_dec, v_r]
-	    v_X, v_Y, v_Z = v_xyz
-	    
-	    # Compute orbital velocity (V_phi in the Galactic plane)
-	    V_phi = (X * v_Y - Y * v_X) / sqrt(X^2 + Y^2)
-	    
-	    return R_G, v_X, v_Y, v_Z, V_phi
+	    # 1. Convert star position to Galactocentric Cartesian coordinates
+	    X = d_kpc * cosd(b) * cosd(l)
+	    Y = d_kpc * cosd(b) * sind(l)
+	    Z = d_kpc * sind(b)
+	
+	    X_GC = R_0 - X
+	    Y_GC = -Y  # Sign flip for Galactic rotation direction
+	    Z_GC = Z
+	
+	    R_GC = sqrt(X_GC^2 + Y_GC^2 + Z_GC^2)  # Galactocentric radius
+	
+	    # 2. Compute velocities in Galactic coordinates
+	    μ_l = pmra_masyr / cosd(b)  # Corrected proper motion in l
+	    μ_b = pmdec_masyr
+	
+	    v_l = 4.74 * d_kpc * μ_l  # km/s
+	    v_b = 4.74 * d_kpc * μ_b  # km/s
+	
+	    # 3D velocity components (U, V, W)
+	    U = v_r_kms * cosd(b) * cosd(l) - v_l * sind(l) - v_b * cosd(l) * sind(b)
+	    V = v_r_kms * cosd(b) * sind(l) + v_l * cosd(l) - v_b * sind(l) * sind(b)
+	    W = v_r_kms * sind(b) + v_b * cosd(b)
+	
+	    # Correct for Sun's motion and Galactic rotation
+	    U_corr = U + U_sun
+	    V_corr = V + V_sun + Θ_0
+	    W_corr = W + W_sun
+	
+	    # 3. Compute orbital (azimuthal) velocity
+	    V_phi = (X_GC * V_corr - Y_GC * U_corr) / sqrt(X_GC^2 + Y_GC^2)
+	
+	    return R_GC, U_corr, V_corr, W_corr, V_phi
 	end
 	
-	# Apply transformation and filter
-	results = map(row -> galactocentric_transform(row.ra, row.dec, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity), eachrow(N))
-
-
-	N[!, :Galactocentric_Radius] = [r[1] for r in results]
-	N[!, :Vx] = [r[2] for r in results]
-	N[!, :Vy] = [r[3] for r in results]
-	N[!, :Vz] = [r[4] for r in results]
-	N[!, :V_phi] = [r[5] for r in results]  # Orbital velocity
+	# Apply to your dataframe
+	results = map(row -> compute_galactocentric_kinematics(row.ra, row.dec, row.l, row.b, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity), eachrow(N))
 	
-	N_New = filter(row -> row.Galactocentric_Radius > 0, N)  # Keeping only positive distances
+	# Add columns to dataframe
+	N[!, :Galactocentric_Radius] = [r[1] for r in results]
+	N[!, :V_X] = [r[2] for r in results]
+	N[!, :V_Y] = [r[3] for r in results]
+	N[!, :V_Z] = [r[4] for r in results]
+	N[!, :V_phi] = [r[5] for r in results]
+	
+	# Filter (if needed)
+	N_New = filter(row -> row.R_G > 0, N)
 end
-
 
 # ╔═╡ 95432f3f-e4e5-48e4-abc2-522a1af4d402
 begin
@@ -365,7 +399,7 @@ end
 # ╔═╡ fb84175b-122e-4121-8498-085810627024
 begin
 	
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi.+220, marker=:circle, xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity and the Keplerian", legend=true, label="Observed Object", xlims=(0, xmax), ylims=(0, 500))
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi, marker=:circle, xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity and the Keplerian", legend=true, label="Observed Object", xlims=(0, xmax), ylims=(0, 500))
 
 	G = 4.302e-6  # kpc * (km/s)^2 / Msun
 	
@@ -421,7 +455,7 @@ begin
 	
 	
 	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi.+240, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.3 , xlims=(0, x_max), ylims=(0, 500))
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.3 , xlims=(0, x_max), ylims=(0, 500))
 	
 
 	# Customize the plot further
@@ -566,7 +600,7 @@ begin
 	    V_total_interp = extrapolate(V_total_interp, Line())
 	
 	    # Step 2: Compute residuals
-	    residuals = (N_New.V_phi .+ 220) .- V_total_interp.(N_New.Galactocentric_Radius)
+	    residuals = (N_New.V_phi) .- V_total_interp.(N_New.Galactocentric_Radius)
 	
 	    # Step 3: Sort for smooth plotting
 	    sorted_indices = sortperm(N_New.Galactocentric_Radius)
@@ -654,7 +688,7 @@ function plot_residualsSimple(N_New, r, V_total_curve)
     V_total_interp = extrapolate(V_total_interp, Line())
 
     # Step 2: Computing residuals
-    residuals = (N_New.V_phi .+ 220) .- V_total_interp.(N_New.Galactocentric_Radius)
+    residuals = (N_New.V_phi) .- V_total_interp.(N_New.Galactocentric_Radius)
 
     # Step 3: Sorting for smooth plotting
     sorted_indices = sortperm(N_New.Galactocentric_Radius)
@@ -784,7 +818,7 @@ begin
 	V_total_curve = sqrt.(V_bulge_curve.^2 + V_disk_curve.^2 + V_HI_curve.^2 + V_H2_curve.^2 + V_halo_curve.^2)
 	
 	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi.+240, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 500))
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.1 , xlims=(0, xmax_2), ylims=(0, 500))
 	
 	# Overlay the rotation curve components and the total curve
 	plot!(r, V_bulge_curve, label="Bulge", color=:blue, linewidth=2)
@@ -2423,8 +2457,8 @@ version = "1.4.1+2"
 # ╟─d7213a5c-f663-420d-99fd-1ea15758c4bc
 # ╟─868ae38e-5355-42cf-b645-1ae6d6b443c8
 # ╟─6e0c44d6-af43-4dbd-ab2f-d36053e2559a
-# ╠═93763c84-79f2-4cca-9a97-a871361c92a3
-# ╠═f7c435ef-deb8-49b5-8406-ec0b36116aac
+# ╟─93763c84-79f2-4cca-9a97-a871361c92a3
+# ╟─f7c435ef-deb8-49b5-8406-ec0b36116aac
 # ╟─bc5edd76-7aa4-494c-b78e-2949a032b0a9
 # ╟─f0807783-6915-49e5-a49f-eb770695b0ce
 # ╟─7f1f1fc5-1077-4f56-94de-6a56521ad0e1

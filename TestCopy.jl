@@ -16,438 +16,292 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ 0b0fbb27-6b38-4ab7-8b14-18a3023698b6
+# ╔═╡ dab5f085-ac90-4342-b2eb-60b097320de9
 begin
-	#hideall
 	using CSV
 	using DataFrames
-	file_path = "DataSets/Job1743628405968O-result.csv"
-	# Load the Gaia data
-	df = CSV.read(file_path, DataFrame)
-	# Drop rows with missing RA or Dec values
-	df1 = dropmissing(df, [:ra, :dec]) 
-
-end
-
-# ╔═╡ 103b6c4c-a50c-4c61-8499-d78df265fae1
-begin
 	using PlutoUI
-	md"""
-	**Adjust X-Axis Scale (View Window)  
-	Max R (kpc):** $(@bind xmax Slider(0:1:50; default=25, show_value=true))
-	
-	Galactic Enclosed Mass / Solar Masses:** $(@bind mass_slider Slider(1e10:1e10:1e12, show_value=true, default=1e11))
-		"""
+	using Plots
+	using Statistics
+	using Interact
+	using Interpolations
+	using Distributions
+	using Random
+	using StatsPlots 
+	using LaTeXStrings
+	using ColorSchemes
+	using Optim
+	using Loess, Polynomials, GLM, LsqFit, KernelDensity
+
+	plotly()  # Set the plotting backend separately, outside of `using`
 end
 
-# ╔═╡ d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
+
+# ╔═╡ f269ff32-3e80-4548-97c6-d337827db7aa
 md"""
 #### Parag Chettri ~ Santiago Berumen ~ Isaac Whitson
 # An Analysis of Milky Way's Rotation Curve: A Julia Approach
-## Data from Gaia DR 2
+## Data from Gaia DR 3 vs DR2
 """
 
-# ╔═╡ f09fd8c0-416b-4f95-b107-a29a1b7cb3d1
+# ╔═╡ 75ed8198-3115-4cf2-989d-93c4af8ed9c9
+
+
+# ╔═╡ 25699170-0fcd-11f0-2202-772042e9fd47
 begin
+	md"""
+	### QUERY to RUN
 
-    md"""
-    ### Select a Dataset
+	```sql
+	SELECT TOP 100000 
+	    source_id, ra, dec, l, b, parallax, radial_velocity, 
+	    pmra, pmdec, parallax_error, radial_velocity_error, 
+	    pmra_error, pmdec_error
+	FROM gaiadr2[/3].gaia_source
+	WHERE abs(b) < 1
+	    AND radial_velocity IS NOT NULL
+	    AND ra IS NOT NULL
+	    AND dec IS NOT NULL
+	    AND l IS NOT NULL
+	    AND b IS NOT NULL
+	    AND pmra IS NOT NULL
+	    AND pmdec IS NOT NULL
+	    AND source_id IS NOT NULL
+	    AND parallax > 0.04
+	    AND parallax < 99
+	    AND (
+	        (l > -5 AND l < 5) 
+	        OR 
+	        (l > 175 AND l < 185)
+	    )
+	```
+	"""
+end
 
-    Choose the dataset you'd like to use (numbers 1-5 only): $(@bind x TextField(default="1"))
+
+# ╔═╡ 80ec79c4-9971-47a2-a884-5417254a31fd
+begin
+	#hideall
+	file_path = "DataSets/DR3Training-1745182203820O-result.csv"
+	# Load the Gaia data
+	ts = CSV.read(file_path, DataFrame);
+end
+
+# ╔═╡ 0eae3652-7c88-4384-bede-797d0120d907
+begin
+	md"""# More Readable Data
+	Later on in the notebook we will see multiple plots that may become difficult to read when using >15000 data points. In order to make this lab more readable we allow you to pick a randomly split up subset of the data to make the plots a lot easier to understand. It is important to note that the subset of data should lead you to the same conclusion, if you do this lab 4 times with all 4 subsets the results should be nearly identical."""
+end
 
 
-   
-   
-    ##### Confirm dataset selection
+# ╔═╡ 25d4e76d-b41a-4d57-bd8f-1e0e8cf15f32
+begin
+	md"""
+	Subset Selection: $(@bind subset_pick PlutoUI.Select([1=>"Subset 1", 2=>"Subset 2", 3=>"Subset 3", 4=>"Subset 4"]))
+	"""
+end
 
-    Confirm dataset selection: $(@bind confirm_checkbox CheckBox(default=false))
-    """
-end 
 
-# ╔═╡ 21841a07-4cb7-4c08-ba43-78cf6feca25a
-# ╠═╡ disabled = true
-#=╠═╡
+# ╔═╡ f2c32e49-eca8-46bf-8912-2edca39b5054
+begin
+	pmo_size = Int(floor(nrow(ts) / 4))
+
+	if subset_pick == 1
+		df1 = ts[1:pmo_size, :]
+	elseif subset_pick == 2
+		df1 = ts[pmo_size+1:2*pmo_size, :]
+	elseif subset_pick == 3
+		df1 = ts[2*pmo_size+1:3*pmo_size, :]
+	elseif subset_pick == 4
+		df1 = ts[3*pmo_size+1:end, :]
+	end
+end
+
+
+# ╔═╡ 5cafcc62-1f8e-4610-bfba-7cd0d4ac0484
+details(
 md"""
-### Select a Dataset
-
-Choose the dataset you'd like to use (numbers 1-5 only): 
-
-# Bind the dropdown to `x`
-$(@bind x Select([:1 => "1", :2 => "2", :3 => "3", :4 => "4", :5 => "5"], default=:1))
-
-"""
-
-  ╠═╡ =#
-
-# ╔═╡ 050fbb3b-61b4-492d-b988-798c1d75e2cb
-# ╠═╡ disabled = true
-#=╠═╡
-@bind lrm_2d_vars PlutoUI.combine() do Child
-	md"""
-	Select the dataset you'd like to use (1-5):  
-	x: $(Child(Select([:1 => "1", :2 => "2", :3 => "3", :4 => "4", :5 => "5"], default=:1)))
-
-	##### Confirm dataset selection
+A deeper dive into the conversion from (RA, Dec) to Galactic (l, b).  Click if you're curious for more details.""",
+md"""
+### Conversion from (RA, Dec) to Galactic (l, b)
 	
-	Confirm dataset selection: $(@bind confirm_checkbox CheckBox(default=false))
-	"""
-end
-  ╠═╡ =#
+The relationship between Equatorial and Galactic coordinates is given by a rotation transformation. The Galactic north pole is at:
+	
+	
+$\alpha_{GP} = 192.8595^\circ, \quad \delta_{GP} = 27.1284^\circ$
+	
+The Galactic center is at:
+	
+$\alpha_{GC} = 266.4051^\circ, \quad \delta_{GC} = -28.9362^\circ$
+	
+The inclination angle is:
 
-# ╔═╡ ab16d475-a6bf-4dec-8d65-caf44c7bd4ae
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-x_int = tryparse(Int, x)
 
-    if x_int !== nothing && 1 ≤ x_int ≤ 5
-        file_path = "DataSets/TwentyK$(x_int).csv"
-        msg = "You have selected file: **$file_path**"
-    else
-        file_path = nothing
-        msg = "This file does not exist, please choose a different number."
-    end
+$i = 62.8717^\circ$
+	
+Using these, we can compute the Galactic latitude $b$ for each star. The formula for $b$ is given by:
+	
+$\sin(b) = \sin(\delta) \sin(\delta_{GP}) + \cos(\delta) \cos(\delta_{GP}) \cos(\alpha - \alpha_{GP})$
+	
+	
+Where: $\alpha$ is the Right Ascension $(RA)$ of the star in degrees
+	
+Where: $\delta$ is the Declination $(Dec)$ of the star in degrees
+	
+Where: $\alpha_{GP}$ and $\delta_{GP}$ are the coordinates of the Galactic north pole
+	
+Where: $b$ is the Galactic latitude
 
-    # If the checkbox is checked, confirm the dataset is selected
-    if confirm_checkbox
-        msg *= "You have confirmed the dataset selection."
-    else
-        msg *= "Please confirm your selection using the checkbox."
-    end
+We can now restrict our data by only allowing a certain maximum deviation from 0 of $b$. 
+	
+As deviation can be positive or negative, we will use the absolute value for $b$ to limit our values.
+	
+We will choose a value of $b = 1^\circ$. 
+	
+(This is reflected in our query as $abs(b) < 1$)
+""")
 
-    # Display the message with the result
-    md"""
-    $msg
-    """
-end
-  ╠═╡ =#
-
-# ╔═╡ a9927068-c517-4457-9394-823c8bdbeba4
+# ╔═╡ d1af481b-5a8e-469f-982a-401fbffd4590
 begin
 	md"""
-	### QUERY
-	
-	SELECT TOP 100000 source_id, ra, dec, l, b, parallax, radial_velocity, 
-       pmra, pmdec, parallax_error, radial_velocity_error, pmra_error, pmdec_error
-	FROM gaiadr2.gaia_source
-	WHERE radial_velocity IS NOT NULL
-	  AND parallax IS NOT NULL
-	  AND pmra IS NOT NULL
-	  AND pmdec IS NOT NULL
-	  AND parallax_error IS NOT NULL
-	  AND radial_velocity_error IS NOT NULL
-	  AND pmra_error IS NOT NULL
-	  AND pmdec_error IS NOT NULL
-	  AND ABS(b) < 2.5;
+	### Plotting the positions of our Stars (within our Galactic Coordinate Parameters)
 
+	We have chosen a value of $abs(b) < 1^\circ$. 
 	"""
 end
-
-# ╔═╡ 36b65f5b-f767-48fd-a43a-0da33ca35f59
-begin
-	# Further filtering for stars with non-missing parallax, pmra, and pmdec
-
-		N = filter(row -> !ismissing(row.parallax) && row.parallax > 0 && !ismissing(row.pmra) && !ismissing(row.pmdec) && abs(row.b) < 5, df1)
-		N[!, :distance_kpc_error] = 1.0 ./ N.parallax_error
-		N[!, :distance_kpc] = 1.0 ./ N.parallax
-		N[!, :proper_motion] = sqrt.(N.pmra.^2 .+ N.pmdec.^2)
-		N[!, :proper_motion_error] = sqrt.(N.pmra_error.^2 .+ N.pmdec_error.^2)
-		N[!, :tangential_velocity_error] = 4.74 .* N.proper_motion_error .* 		N.distance_kpc_error
-		N[!, :tangential_velocity] = 4.74 .* N.proper_motion .* N.distance_kpc
-end
-
-# ╔═╡ 8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
-begin
-	md"""
-	### Conversion from (RA, Dec) to Galactic (l, b)
-	
-	The relationship between Equatorial and Galactic coordinates is given by a rotation transformation. The Galactic north pole is at:
-	
-	
-	$\alpha_{GP} = 192.8595^\circ, \quad \delta_{GP} = 27.1284^\circ$
-	
-	The Galactic center is at:
-	
-	$\alpha_{GC} = 266.4051^\circ, \quad \delta_{GC} = -28.9362^\circ$
-	
-	The inclination angle is:
 	
 
-	$i = 62.8717^\circ$
-	
-	Using these, we can compute the Galactic latitude $b$ for each star. The formula for $b$ is given by:
-	
-	$\sin(b) = \sin(\delta) \sin(\delta_{GP}) + \cos(\delta) \cos(\delta_{GP}) \cos(\alpha - \alpha_{GP})$
-	
-	
-	Where: $\alpha$ is the Right Ascension $(RA)$ of the star in degrees
-	
-	Where: $\delta$ is the Declination $(Dec)$ of the star in degrees
-	
-	Where: $\alpha_{GP}$ and $\delta_{GP}$ are the coordinates of the Galactic north pole
-	
-	Where: $b$ is the Galactic latitude
-
-	We can now restrict our data by only allowing a certain maximum deviation from 0 of $b$. 
-	
-	As deviation can be positive or negative, we will use the absolute value for $b$ to limit our values.
-	
-	We will choose a value of $b = 5^\circ$.
-	"""
-end
-
-# ╔═╡ d3c12dbb-0fc1-4d31-bf5e-5812c5e51fb8
-begin
-	md"""
-	### Distance Calculation from Parallax 
-	"""
-end
-
-# ╔═╡ bceadb12-7d88-4a8b-aae0-a696366627ce
-begin
-	md""" 
-	
-	The distance $D$ in kiloparsecs $(kpc)$ is calculated using the parallax $p$ in milliarcseconds $(mas)$:  
-	
-	$D = \frac{1}{p}$
-	
-	where: $D$ is in kiloparsecs $(kpc)$  
-	
-	where: $p$ is the parallax in milliarcseconds $(mas)$ 
-
-	The array of distances in $kpc$ is shown below.
-	"""
-end
-
-# ╔═╡ 59113f1c-5298-4eac-b3d5-7c54bc311e36
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	N[!, :distance_kpc_error] = 1.0 ./ N.parallax_error
-	N[!, :distance_kpc] = 1.0 ./ N.parallax
-end
-  ╠═╡ =#
-
-# ╔═╡ 03e14a7c-4535-4635-9370-dcd5e83f99e4
-begin
-	N[!, :distance_kpc_error] 
-	N[!, :distance_kpc] 
-end
-
-# ╔═╡ 0f93be8e-c045-4cba-8755-44bf01faad1e
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	N.distance_kpc_error = 1.0 ./ (N.parallax_error)
-	N.distance_kpc = 1.0 ./ N.parallax
-end
-  ╠═╡ =#
-
-# ╔═╡ 26c44b6e-0e5a-47d1-a2d8-52cdc8a8b3f9
-begin
-	md"""
-	### Finding the stars' Tangential Velocity
-	"""
-end
-
-# ╔═╡ 37675bef-ab4b-4b7a-a946-102148c6dce6
-begin
-	md"""	
-	The equation for the tangential velocity $V_{\text{tan}}$ is given by:
+# ╔═╡ 12438dd0-68a0-4906-87ca-93d28d2a20b0
+details(
+md"""
+A brief explanation of how we applied space velocity here.  Click if you're curious for more details.""",
+md"""The equation for the tangential velocity $V_{\text{tan}}$ is given by:
 	
 	
-	$V_{\text{tan}} = 4.74 \times D \times \sqrt{\mu_l^2 + \mu_b^2}$
-	
-	
-	Where $4.74$ is the conversion factor from milliarcseconds per year $(mas/yr)$ to ($km/s$)
-	
-	Where $D$ is the distance in kiloparsecs $(kpc)$
-	
-	Where $\mu_l$ and $\mu_b$ are the proper motions in the sky (in $mas/yr$).
-
-	The array of $V_{\text{tan}}$ in $km/s$ is shown below.
-	"""
-end
-
-# ╔═╡ d49c4bf9-b542-4c21-a4c1-6423f9bdf059
-begin
-	N[!, :proper_motion]
-	N[!, :proper_motion_error]
-	N[!, :tangential_velocity_error]
-	N[!, :tangential_velocity]
-end
-
-# ╔═╡ 28a49599-56dc-48b5-bafc-b7ed456e3e2d
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	N[!, :proper_motion] = sqrt.(N.pmra.^2 .+ N.pmdec.^2)
-	N[!, :proper_motion_error] = sqrt.(N.pmra_error.^2 .+ N.pmdec_error.^2)
-	N[!, :tangential_velocity_error] = 4.74 .* N.proper_motion_error .* 	N.distance_kpc_error
-	N[!, :tangential_velocity] = 4.74 .* N.proper_motion .* N.distance_kpc
-end
-  ╠═╡ =#
-
-# ╔═╡ ae23b057-cb23-408f-801d-db86b29ce617
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	# Compute total proper motion in mas/yr
-    N.proper_motion = sqrt.(N.pmra.^2 .+ N.pmdec.^2)
-	N.proper_motion_error = sqrt.(N.pmra_error.^2 .+ N.pmdec_error.^2)
-    # Compute tangential velocity (km/s)
-	N.tangential_velocity_error = 4.74 .* N.proper_motion_error .* N.distance_kpc_error
-	N.tangential_velocity = 4.74 .* N.proper_motion .* N.distance_kpc
-
-end
-  ╠═╡ =#
-
-# ╔═╡ 5580ffda-b8fa-4504-830e-588c91bcdbda
-begin
-	md"""
-	### True Velocity from Radial and Tangential Velocities
-	"""
-end
-
-# ╔═╡ 4cb64ec9-4c1c-47ec-857d-45e764df2e56
-begin
-	md"""
-	
-	The true velocity $V_{\text{true}}$ is calculated using the radial velocity $V_{\text{radial}}$ and tangential velocity $V_{\text{tangential}}$:
-	
-	$V_{\text{true}} = \sqrt{V_{\text{radial}}^2 + V_{\text{tangential}}^2}$
+$V_{\text{tan}} = 4.74 \times D \times \sqrt{\mu_l^2 + \mu_b^2}$
 
 	
-	where: $V_{\text{true}}$ is the true velocity in $km/s$ 
+Where $4.74$ is the conversion factor from milliarcseconds per year $(mas/yr)$ to ($km/s$)
 	
-	where: $V_{\text{radial}}$ is the radial velocity (along the line of sight) 
+Where $D$ is the distance in kiloparsecs $(kpc)$
+	
+Where $\mu_l$ and $\mu_b$ are the proper motions in the sky (in $mas/yr$).
 
+The array of $V_{\text{tan}}$ in $km/s$ is shown below.
+
+The space velocity $V_{\text{space}}$ is calculated using the radial velocity $V_{\text{radial}}$ and tangential velocity $V_{\text{tangential}}$:
+	
+$V_{\text{space}} = \sqrt{V_{\text{radial}}^2 + V_{\text{tangential}}^2}$
 
 	
-	where: $V_{\text{tangential}}$ is the tangential velocity (perpendicular to the line of sight)
-
-	For simplicity's sake, we will ignore the fact that our sun and solar system are also orbiting the Galactic center.
+where: $V_{\text{space}}$ is the space velocity in $km/s$ 
 	
-	The array of $V_{\text{true}}$ in $km/s$ is shown below.
+where: $V_{\text{radial}}$ is the radial velocity (along the line of sight) 
+
 	
-	"""
-end
-
-# ╔═╡ db27aa1b-23da-4ace-bfda-9a34ecf4554a
-begin
-    # Compute true velocity (km/s), filtering out missing radial velocities
-    N[!, :true_velocity_error] = sqrt.(N.tangential_velocity_error.^2 .+ coalesce.(N.radial_velocity_error, 0.0).^2)
-    N[!, :tangential_velocity_corrected] = N.tangential_velocity
-    N[!, :true_velocity] = sqrt.(N.tangential_velocity_corrected.^2 .+ coalesce.(N.radial_velocity, 0.0).^2)
-end
-
-# ╔═╡ 947e2007-d7e9-4049-b324-0b41d13c80b3
-begin
-	md"""
-	Now there is something still wrong with our data. 
+where: $V_{\text{tangential}}$ is the tangential velocity (perpendicular to the line of sight)
 	
-	Gaia, our source, does not correct for the orbital velocity of our sun and the solar system. This means, in our frame of reference, all the stars within our neighborhood with similar velocities seem to move with near-zero velocities. 
+The array of $V_{\text{space}}$ in $km/s$ is shown below.
 
-	We must now find a way to correct our data, particularly by shifting the rest frame to the Galactic Center and have our independant value of Distance be the Galactocentric Radius instead!
+Now there is something still wrong with our data. 
 	
-	"""
-end
+Gaia, our source, does not correct for the orbital velocity of our sun and the solar system. This means, in our frame of reference, all the stars within our neighborhood with similar velocities seem to move with near-zero velocities. 
 
-# ╔═╡ 58c42bec-6967-4023-8d52-eea5376ec0b8
+We must now find a way to correct our data, particularly by shifting the rest frame to the Galactic Center and have our independant value of Distance be the Galactocentric Radius instead!
+
+""")
+
+# ╔═╡ 34394d4f-5c13-4fa5-977e-1f0aee78dc2c
 begin
 	md"""
 	# Translating our data to a Galactocentric Rest Frame
 	"""
 end
 
-# ╔═╡ 8ee908d3-f28e-4146-8a10-811fde6938cc
+# ╔═╡ 8c1e2c97-381d-4c3b-af76-e269e46feb8c
+
 begin
-	md"""
-	## **Transformation Function**
-	The function `galactocentric_transform` converts equatorial coordinates (RA, Dec, distance) and velocities to Galactocentric values.
-	
-	### **1. Coordinate Conversion**
-	Given:
-	- Right Ascension ($\alpha$) in degrees
-	- Declination ($\delta$) in degrees
-	- Distance ($d$) in kpc
-	- Proper motions ($v_{ra}$, $v_{dec}$) and radial velocity ($v_r$)
-	
-	We convert RA and Dec to radians:
-	$\alpha = \deg2rad(ra), \quad \delta = \deg2rad(dec)$
-	
-	Using spherical-to-Cartesian transformation, the position $(x, y, z)$ in the equatorial frame is:
-		
-	$\begin{aligned}
-		x &= d \cos(\delta) \cos(\alpha) \\
-		y &= d \cos(\delta) \sin(\alpha) \\
-		z &= d \sin(\delta)
-	\end{aligned}$
-	
-	### **2. Rotation to Galactic Frame**
-	The transformation matrix $R$ converts equatorial coordinates to Galactic coordinates:
-	
-	$R = \begin{bmatrix}
-	    -0.05487556 & -0.87343709 & -0.48383502 \\
-	    +0.49410943 & -0.44482963 & +0.74698224 \\
-	    -0.86766615 & -0.19807637 & +0.45598378
-	\end{bmatrix}$
+	md""" ## **Transformation Function**
 
-	
-	Multiplying $R$ by the position vector:
-	
-	$\begin{bmatrix} X \\ Y \\ Z \end{bmatrix} = R \cdot \begin{bmatrix} x \\ y \\ z \end{bmatrix}$
-	
-	### **3. Computing Galactocentric Radius**
-	The Galactocentric radius is given by:
-	
-	$R_G = \sqrt{X^2 + Y^2 + Z^2} \text{ kpc}$
-	
-	### **4. Velocity Transformation**
-	Applying the same rotation matrix $R$ to the velocity components:
-	
-	$\begin{bmatrix} v_X \\ v_Y \\ v_Z \end{bmatrix} = R \cdot \begin{bmatrix} v_{ra} \\ v_{dec} \\ v_r \end{bmatrix}$
-	
-	### **5. Computing Orbital Velocity**
-	The azimuthal (orbital) velocity $V_{\phi}$ in the Galactic plane is derived using:
-	
-	$V_{\phi} = \frac{X v_Y - Y v_X}{\sqrt{X^2 + Y^2}}$
-	
-	## **Applying the Transformation**
-	The function is applied to each row in dataset `N`, extracting transformed values:
-	
-	$N[!, :Galactocentric\_Radius] = R_G$
-	
-	$N[!, :Vx] = v_X, \quad N[!, :Vy] = v_Y, \quad N[!, :Vz] = v_Z, \quad N[!, :V_\phi] = V_\phi$
-	
-	Finally, a filtering step ensures only positive Galactocentric distances are retained:
-	
-	$N\_New = \{ R_G > 0 \}$
-	
-	This completes the transformation of equatorial coordinates and velocities into a Galactocentric reference frame.
-	"""
+The function `compute_galactocentric_kinematics` computes a star's Galactocentric kinematics using Galactic coordinates directly.
+
+### **1. Galactic Coordinate Inputs**
+
+Given:
+- Galactic longitude ($l$) and latitude ($b$) in degrees
+- Distance ($d$) in kiloparsecs (kpc)
+- Proper motions in RA and Dec (pmRA, pmDec) in mas/yr
+- Radial velocity $v_r$ in km/s
+
+We compute the Cartesian position relative to the Galactic Center:
+
+$x = d \cdot \cos(b) \cdot \cos(l)$  
+$y = d \cdot \cos(b) \cdot \sin(l)$  
+$z = d \cdot \sin(b)$
+
+Then, we shift to Galactocentric coordinates by subtracting the Sun’s location (assuming $R_0 = 8.5 \, \text{kpc}$):
+
+$X_{GC} = R_0 - x$  
+$Y_{GC} = -y$  
+$Z_{GC} = z$
+
+The Galactocentric radius is:
+
+$R_{GC} = \sqrt{X_{GC}^2 + Y_{GC}^2 + Z_{GC}^2}$
+
+### **2. Velocity Components in Galactic Coordinates**
+
+Proper motions are scaled using:
+
+$\mu_l = \frac{\text{pmRA}}{\cos(b)}$  
+$\mu_b = \text{pmDec}$
+
+Velocities in the Galactic coordinate frame are computed using:
+
+$v_l = 4.74 \cdot d \cdot \mu_l$  
+$v_b = 4.74 \cdot d \cdot \mu_b$
+
+Then, the space velocity components $U, V, W$ in the Galactic frame are:
+
+$U = v_r \cdot \cos(b) \cdot \cos(l) - v_l \cdot \sin(l) - v_b \cdot \cos(l) \cdot \sin(b)$  
+$V = v_r \cdot \cos(b) \cdot \sin(l) + v_l \cdot \cos(l) - v_b \cdot \sin(l) \cdot \sin(b)$  
+$W = v_r \cdot \sin(b) + v_b \cdot \cos(b)$
+
+### **3. Solar Motion and Galactic Rotation Correction**
+
+We correct for the solar peculiar motion $(U_\odot, V_\odot, W_\odot) = (11.1, 12.24, 7.25)\,\text{km/s}$, and the Galactic circular speed at the Sun ($\Theta_0 = 220 \, \text{km/s}$):
+
+$U_{\text{corr}} = U + U_\odot$  
+$V_{\text{corr}} = V + V_\odot + \Theta_0$  
+$W_{\text{corr}} = W + W_\odot$
+
+### **4. Orbital (Azimuthal) Velocity**
+
+The azimuthal velocity $V_\phi$, projected onto the Galactic plane, is given by:
+
+$V_\phi = \frac{X_{GC} \cdot V_{\text{corr}} - Y_{GC} \cdot U_{\text{corr}}}{\sqrt{X_{GC}^2 + Y_{GC}^2}}$
 
 
-end
+Source: [(Stellar Kinematics)](https://en.wikipedia.org/wiki/Stellar_kinematics)
 
-# ╔═╡ 7aa8b082-5642-474b-99aa-6279573f4102
+	
+### **5. Applying the Transformation**
 
-
-# ╔═╡ 52be580b-0add-4c32-aba1-719b5898c5fa
-begin
-	md"""
-	This calculation of $V_{\phi}$ is jus the given deviation from the Galactic mean orbital velocity which we can assign as a normalizing value on our graph for disk stars as +220 km/s [(Stellar Kinematics)](https://en.wikipedia.org/wiki/Stellar_kinematics).
+The function is applied to each row of the dataset `N` using the 'map' function from DataFrames.
+	
 	"""
 end
+	
 
-# ╔═╡ ddd1d5c6-cbfd-48e4-89b4-bfb3767d7c14
+
+# ╔═╡ 95432f3f-e4e5-48e4-abc2-522a1af4d402
 begin
 	md"""
 	### The Keplerian Orbit
 	"""
 end
 
-# ╔═╡ fcbbfa5d-bbf3-480b-b1b0-c4b835525113
+# ╔═╡ 7d85f4cd-e4e8-4076-afc5-33daf90c08fe
 begin
 	md"""
 
@@ -465,19 +319,132 @@ begin
 end
 	
 
-# ╔═╡ 2b7a8b7e-a6d1-4360-b155-54c1bc771ee1
+# ╔═╡ 3ae662a1-2c66-4810-9770-514cc93897ff
+begin
+	md"""
+	**Adjust X-Axis Scale (View Window)  
+	Max R (kpc):** $(@bind xmax Slider(0:1:50; default=25, show_value=true))
+	
+	**Galactic Enclosed Mass / Solar Masses:** $(@bind mass_slider Slider(1e10:1e10:1e12, show_value=true, default=1e11))
+		"""
+end
+
+# ╔═╡ 077c4e59-79e9-4108-85c8-cf6e06458394
 begin
 	md"""
 	Needless to say, the rotation of the galaxy is clearly not bound just to Keplarian parameters.
+	This has many reasons, but one of the most obvious ones being that there are many objects in this case and varying distances which increase the complexity with many interactions.
 	"""
 end
 
-# ╔═╡ 81f8893e-4c4b-4318-8e3d-70259cf4e044
+# ╔═╡ 31184cf1-9242-4858-a7ca-4afb729ee1f0
 begin
 	md"""
-	# Our Prior - Milky Way Rotation Curve Components
+	### A Linear Regression Fit
+	"""
+end
+
+# ╔═╡ bab951b8-227f-4c89-a4a3-08f65a16fc35
+begin
+	md"""
+	**Adjust Average Velocity:** $(@bind scaler1 Slider(100:5:300, show_value=true, default=200))
+	"""
+end
+
+# ╔═╡ 627e2f9c-65d9-4645-a1a4-48c612876bd5
+begin
+	md"""
+	**Adjust X-Axis Scale (View Window)  
+	Max R (kpc):** $(@bind x_max4 Slider(1:1:50; default=25, show_value=true))
+	"""
+end
+
+# ╔═╡ 5ba8beb8-8f36-4c90-ab8c-2f8004804819
+begin
+	md"""
+	We see from this residual plot that a simple linear relationship is not the best explanation for our data as the residiuals show a pattern that we seem to be missing."""
+end
+
+# ╔═╡ ee9e248b-6002-463e-b736-9e91da06b00f
+begin
+    md"""# A Simple Model"""
+end
+
+# ╔═╡ ad6af327-f560-4066-8139-beb2cc919197
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+
+# Stack data as a 2-column matrix for KDE
+data_matrix = hcat(N_New.Galactocentric_Radius, N_New.V_phi)
+
+# KDE on 2D data (KernelDensity expects 2-column matrix)
+kde_result = kde(data_matrix)
+
+# kde_result has fields: x (r grid), y (v grid), and z (density grid)
+x_grid = kde_result.x
+y_grid = kde_result.y
+z_grid = kde_result.density
+
+# Interpolation
+interp = interpolate((x_grid, y_grid), z_grid, Gridded(Linear()))
+density_vals = [interp(xi, yi) for (xi, yi) in zip(N_New.Galactocentric_Radius, N_New.V_phi)]
+
+# Final scatter plot with KDE-based color, using square "pixel"-like markers
+scatter(N_New.Galactocentric_Radius, N_New.V_phi,
+    zcolor = density_vals,
+    c = :viridis,
+    ms = 3,
+    alpha = 0.8,
+    legend = false,
+    colorbar = true,
+    colorbar_title = "Density",
+    xlims = (0, 25),
+    ylims = (0, 400),
+    xlabel = "Galactocentric Radius (kpc)",
+    ylabel = "Orbital Velocity (km/s)",
+    title = "Bivariate KDE of r vs v",
+    markerstrokecolor = :transparent,
+    shape = :rect)  # or try :square
+
+end
+
+  ╠═╡ =#
+
+# ╔═╡ 711fdcf5-333a-44b9-a821-30cea343d89c
+begin
+    md"""
 	
-	The total rotation curve of the Milky Way is the quadrature sum of multiple contributions from the bulge, stellar disk, HI layer, H2 layer, and dark halo:
+Instead, we can understand this as a mathematical curve with minimal parameters. One of the possible approximations for this odd flat curve that we see in the moving-average plot is as follows:
+	
+$$f(x) = V_{x \to \infty} \left( 1 - e^{-0.6 x} \right)$$
+
+
+
+    """
+end
+
+# ╔═╡ 57fa7cfd-8521-46ca-b2fd-70dc506e2593
+begin
+	md"""
+	**Adjust Average Velocity:** $(@bind scaler Slider(180:5:270, show_value=true, default=200))
+	"""
+end
+
+# ╔═╡ 9a619a6a-0814-4c21-a3be-50041c3e198f
+begin
+	md"""
+	**Adjust X-Axis Scale (View Window)  
+	Max R (kpc):** $(@bind x_max Slider(1:1:50; default=25, show_value=true))
+	"""
+end
+
+# ╔═╡ 4d4b096d-a87a-482f-a19c-7918e7af47fa
+begin
+	md"""
+	# A Complex Model - The Dark Matter-corrected Milky Way Rotation Curve
+	
+	The total rotation curve of the Milky Way is the quadrature sum of multiple contributions from the bulge, stellar disk, HI layer, H2 layer, and dark halo (a grand total of 10 parameters make up this model):
 	
 	
 	$V_{\text{total}}(r) = \sqrt{V_{\text{bulge}}^2 + V_{\text{disk}}^2 + V_{\text{HI}}^2 + V_{\text{H2}}^2 + V_{\text{halo}}^2}$
@@ -487,7 +454,7 @@ begin
 	
 	$V_{\text{bulge}}(r) = V_0 \frac{r}{(r^2 + a^2)^{3/4}}$
 	
-	where: $V_0$ is a scaling factor $(~300 km/s)$,
+	where: $V_0$ is a scaling factor $(~260 km/s)$,
 	where: $a$ is a scale radius $(~0.5–1 kpc)$.
 	
 	#### **2. Stellar Disk (Green Line)**
@@ -496,7 +463,7 @@ begin
 	$V_{\text{disk}}(r) = V_0 \left(\frac{r}{R_d}\right) e^{-r/(2 R_d)}$
 	
 	where: $R_d$ is the disk scale length $(~3 kpc)$,
-	where: $V_0$ is a normalization constant $(~200 km/s)$.
+	where: $V_0$ is a normalization constant $(~150 km/s)$.
 	
 	#### **3. HI Layer (Yellow Line)**
 	Neutral hydrogen contributes at intermediate radii:
@@ -523,7 +490,7 @@ begin
 	
 	$V_{\text{halo}}(r) = V_{\infty} \left(1 - e^{-r/R_H}\right)$
 	
-	where: $V_{\infty}$ is the asymptotic velocity $(~220 km/s)$,
+	where: $V_{\infty}$ is the asymptotic velocity $(~205 km/s)$,
 	where: $R_H$ is the halo scale radius $(~20 kpc)$,
 	where: $c$ is a core radius $(~10 kpc)$.
 
@@ -531,202 +498,599 @@ begin
 	
 	$V_{\text{total}}(r)$
 
-	This is our final estimation as a weighted sum of the given distributions.
+	This is our final estimation as sum of the given distributions. Below is a plot of the initial values as mentioned above.
 
 	Source: [(Ueshima, 2010)](https://www-sk.icrr.u-tokyo.ac.jp/xmass/publist/ueshima_PhD.pdf)
 	"""
 end
 
 
-# ╔═╡ 9f4404c3-ca98-4be7-9c8f-187ff582250e
-begin
-	md"""
-	### Prior over the Velocity of Sources
-	"""
-end
-
-# ╔═╡ 3e5f61b8-edbc-41b2-a047-0656bf419bdb
+# ╔═╡ ab4b6e35-bbd6-4c5d-ae6c-cf3cb2092a85
 begin
 	md"""
 	**Adjust X-Axis Scale (View Window)  
-	Max R (kpc):** $(@bind xmax_2 Slider(0:1:50; default=25, show_value=true))
+	Max R (kpc):** $(@bind xmax_2 Slider(1:1:50; default=25, show_value=true))
 	"""
 end
 
-# ╔═╡ 057a643b-128e-461e-9697-8b8344ce6331
+# ╔═╡ 5290729f-3d55-4e0d-9a76-64a5b36aa5b9
+begin
+	md""" ### A Non-Linear Regression Fit to Guess the 10 Parameters for the Milky Way
+	"""
+end
+
+# ╔═╡ d7213a5c-f663-420d-99fd-1ea15758c4bc
+begin
+	md"""# Testing Data vs Training Data
+For our Test data, we will be using Data Release 2. We will apply the same coordinate transformation to this data as we did to the subsets and we will see if our training data's trends hold up.
+
+
+Check if you'd like to see how the test data compares to the training data: $(@bind ready_to_test          CheckBox(; default=false))
+
+
+	
+	"""
+end
+
+# ╔═╡ bc5edd76-7aa4-494c-b78e-2949a032b0a9
 begin
 	md"""
-	**Why are there so many data points between 0 and 7 kpc?**
-	
-	The answer: The galactic center bulge is dense with stars and we are about 8 kpc from the center of the galaxy.
+	# Supporting Functions
 	"""
 end
 
-# ╔═╡ 6b1f254e-9926-40af-b1b9-4a30603ff595
+# ╔═╡ f0807783-6915-49e5-a49f-eb770695b0ce
 begin
-	md"""
-	# NEXT STEPS
-
-	Parag - Fitted the Data with Swag
-
-	Santi - TwentyK[NUMBER] files. Make this user-selectable.
-
-	Isaac - List all statistical things from the labs which we can use here.
-
+	function plot_residuals(N_New, r, V_total_curve)
+	    # Step 1: Interpolation with linear extrapolation
+	    V_total_interp = interpolate((r,), V_total_curve, Gridded(Linear()))
+	    V_total_interp = extrapolate(V_total_interp, Line())
 	
+	    # Step 2: Compute residuals
+	    residuals = (N_New.V_phi) .- V_total_interp.(N_New.Galactocentric_Radius)
 	
-	"""
-end
-
-# ╔═╡ 729d9763-c8ca-4c2d-b208-33373bf66bf5
-begin
-	md"""
+	    # Step 3: Sort for smooth plotting
+	    sorted_indices = sortperm(N_New.Galactocentric_Radius)
+	    sorted_radii = N_New.Galactocentric_Radius[sorted_indices]
+	    sorted_residuals = residuals[sorted_indices]
 	
-	### **Citations**
-
-
+	    # Step 4: Outlier removal (Option A: 0.25σ clipping)
+	    residual_mean = mean(sorted_residuals)
+	    residual_std = std(sorted_residuals)
+	    threshold = 0.25 * residual_std
+	    valid_indices = abs.(sorted_residuals .- residual_mean) .< threshold
 	
-	[Ueshima, K. (2010). Study of pulse shape discrimination and low background techniques for liquid xenon dark matter detectors. Department of Physics, School of Science, University of Tokyo.](https://www-sk.icrr.u-tokyo.ac.jp/xmass/publist/ueshima_PhD.pdf)
-
-	"""
-end
-
-# ╔═╡ a692eefa-ef88-4132-9f25-e92937c22534
-begin
-	md"""
-	# Helper Functions
-	"""
-end
-
-# ╔═╡ 4715974e-c49a-4a64-b0a5-f0f6429f6c47
-function galactocentric_transform(ra, dec, d, pm_ra, pm_dec, v_r)
-    # Convert angles to radians
-    α = deg2rad(ra)
-    δ = deg2rad(dec)
-
-    # Convert Equatorial to Cartesian coordinates relative to Sun (in kpc)
-    x = d * cos(δ) * cos(α)
-    y = d * cos(δ) * sin(α)
-    z = d * sin(δ)
-
-    # Rotation matrix from Equatorial to Galactic coordinates
-    R = [-0.05487556 -0.87343709 -0.48383502;
-         +0.49410943 -0.44482963 +0.74698224;
-         -0.86766615 -0.19807637 +0.45598378]
-
-    # Galactic Cartesian coordinates relative to Sun
-    galactic_coords = R * [x, y, z]
-    X, Y, Z = galactic_coords
-
-    # Compute Galactocentric radius (ensuring it's in kpc)
-    R_G = sqrt(X^2 + Y^2 + Z^2)
-
-    # Proper motion conversion (pm_ra, pm_dec in mas/yr)
-    # Convert to transverse velocity in km/s
-    v_T = 4.74 * d * sqrt(pm_ra^2 + pm_dec^2)  # km/s
-
-    # Compute velocity components in Cartesian form
-    v_x = -v_T * sin(α) + v_r * cos(δ) * cos(α)
-    v_y = v_T * cos(α) + v_r * cos(δ) * sin(α)
-    v_z = v_r * sin(δ)
-
-    # Transform velocity to Galactic coordinates
-    v_xyz = R * [v_x, v_y, v_z]
-    v_X, v_Y, v_Z = v_xyz
-
-    # Compute orbital velocity in the Galactic plane (V_phi)
-    R_cyl = sqrt(X^2 + Y^2)  # Cylindrical radius in kpc
-    V_phi = (X * v_Y - Y * v_X) / R_cyl
-
-    return R_G, v_X, v_Y, v_Z, V_phi
+	    ## Option B: radius threshold (uncomment to use)
+	    # valid_indices = sorted_radii .< 1000
+	
+	    # Step 5: Filtering data
+	    filtered_radii = sorted_radii[valid_indices]
+	    filtered_residuals = sorted_residuals[valid_indices]
+	
+	    # Step 6: Ploting with or without error bars
+	    if :V_phi_error in propertynames(N_New)
+	        sorted_errors = N_New.V_phi_error[sorted_indices]
+	        filtered_errors = sorted_errors[valid_indices]
+	
+	        plot(
+	            filtered_radii, filtered_residuals, yerror=filtered_errors,
+	            label="Residuals", marker=:circle, color=:blue, linewidth=0,
+	            xlabel="Galactocentric Radius (kpc)", ylabel="Residual (km/s)",
+	            title="Residuals: Observed - Model", alpha = 0.4
+	        )
+	    else
+	        plot(
+	            filtered_radii, filtered_residuals,
+	            label="Residuals", marker=:circle, color=:blue, linewidth=0,
+	            xlabel="Galactocentric Radius (kpc)", ylabel="Residual (km/s)",
+	            title="Residuals: Observed - Model", alpha = 0.4
+	        )
+	    end
+	
+	    # Step 7: Adding horizontal line at zero
+	    hline!([0], color=:black, linestyle=:dash, linewidth=2, label="Zero Residual")
+	end
 end
 
 
-# ╔═╡ 5379f512-57ba-4247-bcc5-89d346177bca
+# ╔═╡ f5902359-7f0b-4244-8ebd-191358e3a227
+function plot_residualsSimple(N_New, r, V_total_curve)
+    # Step 1: Interpolation with linear extrapolation
+    V_vals = V_total_curve.(r)
+    V_total_interp = interpolate((r,), V_vals, Gridded(Linear()))
+    V_total_interp = extrapolate(V_total_interp, Line())
+
+    # Step 2: Computing residuals
+    residuals = (N_New.V_phi) .- V_total_interp.(N_New.Galactocentric_Radius)
+
+    # Step 3: Sorting for smooth plotting
+    sorted_indices = sortperm(N_New.Galactocentric_Radius)
+    sorted_radii = N_New.Galactocentric_Radius[sorted_indices]
+    sorted_residuals = residuals[sorted_indices]
+
+    # Step 4: Outlier removal (0.25σ clipping)
+    residual_mean = mean(sorted_residuals)
+    residual_std = std(sorted_residuals)
+    threshold = 0.25 * residual_std
+    valid_indices = abs.(sorted_residuals .- residual_mean) .< threshold
+
+    # Step 5: Filtering data
+    filtered_radii = sorted_radii[valid_indices]
+    filtered_residuals = sorted_residuals[valid_indices]
+
+    # Step 6: Plotting
+    if :V_phi_error in propertynames(N_New)
+        sorted_errors = N_New.V_phi_error[sorted_indices]
+        filtered_errors = sorted_errors[valid_indices]
+
+        plot(
+            filtered_radii, filtered_residuals, yerror=filtered_errors,
+            label="Residuals", marker=:circle, alpha = 0.2, color=:blue, linewidth=0,
+            xlabel="Galactocentric Radius (kpc)", ylabel="Residual (km/s)",
+            title="Residuals: Observed - Model", xlims = (0,x_max)
+        )
+    else
+        plot(
+            filtered_radii, filtered_residuals,
+            label="Residuals", marker=:circle, alpha = 0.2, color=:blue, linewidth=0,
+            xlabel="Galactocentric Radius (kpc)", ylabel="Residual (km/s)",
+            title="Residuals: Observed - Model", xlims = (0,x_max)
+        )
+    end
+
+    # Step 7: Adding horizontal line at zero
+    hline!([0], color=:black, linestyle=:dash, linewidth=2, label="Zero Residual")
+
+end
+
+
+# ╔═╡ efa3f064-bc0f-491b-b06a-d8cd6d42a174
+function plot_residualsFlat(N_New, r, V_total_curve)
+    # Step 1: Interpolation with linear extrapolation
+    V_vals = V_total_curve.(r)
+    V_total_interp = interpolate((r,), V_vals, Gridded(Linear()))
+    V_total_interp = extrapolate(V_total_interp, Line())
+
+    # Step 2: Computing residuals
+    residuals = (N_New.V_phi) .- V_total_interp.(N_New.Galactocentric_Radius)
+
+    # Step 3: Sorting for smooth plotting
+    sorted_indices = sortperm(N_New.Galactocentric_Radius)
+    sorted_radii = N_New.Galactocentric_Radius[sorted_indices]
+    sorted_residuals = residuals[sorted_indices]
+
+    # Step 4: Outlier removal (0.25σ clipping)
+    residual_mean = mean(sorted_residuals)
+    residual_std = std(sorted_residuals)
+    threshold = 0.25 * residual_std
+    valid_indices = abs.(sorted_residuals .- residual_mean) .< threshold
+
+    # Step 5: Filtering data
+    filtered_radii = sorted_radii[valid_indices]
+    filtered_residuals = sorted_residuals[valid_indices]
+
+    # Step 6: Plotting
+    if :V_phi_error in propertynames(N_New)
+        sorted_errors = N_New.V_phi_error[sorted_indices]
+        filtered_errors = sorted_errors[valid_indices]
+
+        plot(
+            filtered_radii, filtered_residuals, yerror=filtered_errors,
+            label="Residuals", marker=:circle, alpha = 0.2, color=:blue, linewidth=0,
+            xlabel="Galactocentric Radius (kpc)", ylabel="Residual (km/s)",
+            title="Residuals: Observed - Model", xlims = (0,x_max4)
+        )
+    else
+        plot(
+            filtered_radii, filtered_residuals,
+            label="Residuals", marker=:circle, alpha = 0.2, color=:blue, linewidth=0,
+            xlabel="Galactocentric Radius (kpc)", ylabel="Residual (km/s)",
+            title="Residuals: Observed - Model", xlims = (0,x_max4)
+        )
+    end
+
+    # Step 7: Adding horizontal line at zero
+    hline!([0], color=:black, linestyle=:dash, linewidth=2, label="Zero Residual")
+
+end
+
+
+# ╔═╡ 70dfc064-52fe-40c2-8ca5-4f50d33711ab
 begin
-	using LinearAlgebra
-	# Constants
+		
+		function V_disk(r, V0, R_d)
+		    return V0 * (r ./ R_d) .* exp.(-r ./ (2 * R_d))
+		end
+		
+		function V_HI(r, V0, b)
+		    return V0 * (r ./ (r.^2 .+ b^2).^(1/2))
+		end
+		
+		function V_H2(r, V0, R_H2)
+		    return V0 * r .* exp.(-r ./ R_H2)
+		end
+		
+		function V_halo(r, V0, c)
+		    return V0 * (r ./ sqrt.(r.^2 .+ c^2))
+		end
 	
-	# Function to convert RA, Dec, d to Galactocentric radius and velocities
+	 V0_bulge = 260
+		a_bulge = 1
+		
+		V0_disk = 150
+		R_d = 3
+		
+		V0_HI = 100
+		b_HI = 5
+		
+		V0_H2 = 80
+		R_H2 = 4
+		
+		V_infinity_halo = 205
+		R_H = 20
+		c_halo = 10
+		function V_bulge(r, V0, a)
+		    return V0 * (r ./ (r.^2 .+ a^2).^(3/4))
+		end
+end
 
-	# Apply transformation and filter
-	results = map(row -> galactocentric_transform(row.ra, row.dec, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity), eachrow(N))
+# ╔═╡ 38a5bc03-c378-40e9-b05c-52f459a173cc
+function total_rotation_curve(r, p)
+    V0_bulge, a_bulge,
+    V0_disk, R_d,
+    V0_HI, b_HI,
+    V0_H2, R_H2,
+    V_halo_inf, c_halo = p
+
+return sqrt.(
+        V_bulge(r, V0_bulge, a_bulge).^2 .+
+        V_disk(r,  V0_disk,  R_d).^2     .+
+        V_HI(r,    V0_HI,    b_HI).^2    .+
+        V_H2(r,    V0_H2,    R_H2).^2    .+
+        V_halo(r,  V_halo_inf, c_halo).^2
+    )
+end
+
+# ╔═╡ 54ce63de-9640-4c00-b685-f8163f5f4bd8
+function rotation_model(r, p)
+        V0_bulge, a_bulge,  # bulge
+        V0_disk,  R_d,      # disk
+        V0_HI,    b_HI,     # HI
+        V0_H2,    R_H2,     # H2
+        V_halo_inf, c_halo = p
+
+        sqrt.(
+            V_bulge(r, V0_bulge, a_bulge).^2 .+
+            V_disk(r,  V0_disk,  R_d).^2      .+
+            V_HI(r,    V0_HI,    b_HI).^2     .+
+            V_H2(r,    V0_H2,    R_H2).^2     .+
+            V_halo(r,  V_halo_inf, c_halo).^2
+        )
+    end
+
+# ╔═╡ cb94e83a-2e31-45d9-b4e0-b352d4595e99
+function filter_galactic_plane(df1; threshold=2.5)
+	    # Convert RA and Dec to radians
+	    ra_rad = deg2rad.(df1.ra)
+	    dec_rad = deg2rad.(df1.dec)
+	
+	    # Galactic north pole coordinates in radians
+	    ra_gp = deg2rad(192.8595)
+	    dec_gp = deg2rad(27.1284)
+	
+	    # Compute sin(b)
+	    sin_b = sin.(dec_rad) .* sin(dec_gp) .+ cos.(dec_rad) .* cos(dec_gp) .* cos.(ra_rad .- ra_gp)
+	
+	    # Compute Galactic latitude b in degrees
+	    b = rad2deg.(asin.(sin_b))
+	
+	    # Filter stars near the Galactic plane (|b| < threshold)
+	    return df1[abs.(b) .< threshold, :]
+	end
+
+# ╔═╡ 2a36ce70-5dc5-401d-864e-9b5e479b7913
+begin
+
+	
+	# Apply filtering: only stars with non-missing parallax, positive parallax, and proper motions
+	filtered_df = filter_galactic_plane(df1)
+	
+	N = filter(row -> !ismissing(row.parallax) && row.parallax > 0 && !ismissing(row.pmra) && !ismissing(row.pmdec), filtered_df)
+end;
 
 
+# ╔═╡ cc962df0-b6a0-481c-a95b-9265930d38d7
+begin
+	# Further filtering for stars with non-missing parallax, pmra, and pmdec
+
+		N[!, :distance_kpc_error] = (1.0 ./ N.parallax_error .+ N.parallax) - (1.0 ./ N.parallax .- N.parallax_error )
+		N[!, :distance_kpc] = 1.0 ./ N.parallax
+		N[!, :proper_motion] = sqrt.(N.pmra.^2 .+ N.pmdec.^2)
+		N[!, :proper_motion_error] = sqrt.(N.pmra_error.^2 .+ N.pmdec_error.^2)
+		N[!, :tangential_velocity_error] = 4.74 .* N.proper_motion_error .* 		N.distance_kpc_error
+		N[!, :tangential_velocity] = 4.74 .* N.proper_motion .* N.distance_kpc
+end;
+
+# ╔═╡ 6f370423-0a7e-4a20-9c69-81fe352020a0
+begin
+    # Compute true velocity (km/s), filtering out missing radial velocities
+    N[!, :true_velocity_error] = sqrt.(N.tangential_velocity_error.^2 .+ coalesce.(N.radial_velocity_error, 0.0).^2)
+    N[!, :tangential_velocity_corrected] = N.tangential_velocity
+    N[!, :true_velocity] = sqrt.(N.tangential_velocity_corrected.^2 .+ coalesce.(N.radial_velocity, 0.0).^2)
+end;
+
+# ╔═╡ d592e7bc-5f1a-41b6-8b13-ba34febeeefa
+function compute_galactocentric_kinematics(ra, dec, l, b, d_kpc, pmra_masyr, pmdec_masyr, v_r_kms)
+	    # Constants
+	    distance_sun_to_galactic_center = 8.5  # kpc (Distance from Galactic Center to Sun)
+	    Θ_0 = 220.0  # km/s (Galactic rotation at Sun)
+	    U_sun, V_sun, W_sun = 11.1, 12.24, 7.25  # km/s
+	
+	    # 1. Convert star position to Galactocentric Cartesian coordinates
+	    X = d_kpc * cosd(b) * cosd(l)
+	    Y = d_kpc * cosd(b) * sind(l)
+	    Z = d_kpc * sind(b)
+	
+	    X_GC = distance_sun_to_galactic_center - X
+	    Y_GC = -Y  # Sign flip for Galactic rotation direction
+	    Z_GC = Z
+	
+	    R_GC = sqrt(X_GC^2 + Y_GC^2 + Z_GC^2)  # Galactocentric radius
+	
+	    # 2. Compute velocities in Galactic coordinates
+	    μ_l = pmra_masyr / cosd(b)  # Corrected proper motion in l
+	    μ_b = pmdec_masyr
+
+		
+		# v_tangential -  km/s= 4.74(conversion factor) * distance - kpc * proper motion in milliarcseconds/year
+		
+	    v_l = 4.74 * d_kpc * μ_l  # km/s
+	    v_b = 4.74 * d_kpc * μ_b  # km/s
+	
+	    # 3D velocity components (U, V, W)
+	    U = v_r_kms * cosd(b) * cosd(l) - v_l * sind(l) - v_b * cosd(l) * sind(b)
+	    V = v_r_kms * cosd(b) * sind(l) + v_l * cosd(l) - v_b * sind(l) * sind(b)
+	    W = v_r_kms * sind(b) + v_b * cosd(b)
+	
+	    # Correct for Sun's motion and Galactic rotation
+	    U_corr = U + U_sun
+	    V_corr = V + V_sun + Θ_0
+	    W_corr = W + W_sun
+	
+	    # 3. Compute orbital (azimuthal) velocity
+	    V_phi = (X_GC * V_corr - Y_GC * U_corr) / sqrt(X_GC^2 + Y_GC^2)
+	
+	    return R_GC, U_corr, V_corr, W_corr, V_phi
+	end
+
+# ╔═╡ 0ccfae55-6162-4c97-a04d-2dd3c5d9370e
+begin
+	
+	# Apply to dataframe
+	results = map(row -> compute_galactocentric_kinematics(row.ra, row.dec, row.l, row.b, row.distance_kpc, row.pmra, row.pmdec, row.radial_velocity), eachrow(N))
+	
+	# Add columns to dataframe
 	N[!, :Galactocentric_Radius] = [r[1] for r in results]
-	N[!, :Vx] = [r[2] for r in results]
-	N[!, :Vy] = [r[3] for r in results]
-	N[!, :Vz] = [r[4] for r in results]
-	N[!, :V_phi] = [r[5] for r in results]  # Orbital velocity
+	N[!, :V_X] = [r[2] for r in results]
+	N[!, :V_Y] = [r[3] for r in results]
+	N[!, :V_Z] = [r[4] for r in results]
+	N[!, :V_phi] = [r[5] for r in results]
 	
-	N_New = filter(row -> row.Galactocentric_Radius > 0, N)  # Keeping only positive distances
+	# Filter 
+	N_New = filter(row -> row.Galactocentric_Radius > 0 && 537 > row.V_phi > 0,  N)
 end
 
-# ╔═╡ 059cb579-672a-4ff9-9477-c3decc2c785e
+# ╔═╡ efda5197-b8ff-467a-8d32-6d9b7992a7ec
 begin
-	using Plots
-	
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi.+220, marker=:circle, xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=true, label="Observed Object", xlims=(0, xmax), ylims=(0, 500))
+
+    ra_rad = deg2rad.(N_New.ra)
+    dec_rad = deg2rad.(N_New.dec)
+    
+    x = N_New.distance_kpc .* cos.(dec_rad) .* cos.(ra_rad)
+    y = N_New.distance_kpc .* cos.(dec_rad) .* sin.(ra_rad)
+    z = N_New.distance_kpc .* sin.(dec_rad)
+
+    # Creating scatter plot
+    p = scatter(x, y, z, markersize = 2, title = "A Map of our DataSet (Over the Disc of the Milky Way", xlabel = "kpc_x", ylabel = "kpc_y", zlabel = "kpc_z", legend=false)
+    
+    # Setting manual limits
+    xlims!(p, -20, 20)
+    ylims!(p, -20, 20)
+    zlims!(p, -20, 20)
+    
+    # Create a galactic disc (radius 13 kpc)
+    θ = range(0, 2π, length=100)  # Angle for circle
+    rr = range(0, 13, length=20)   # Radius steps
+    
+    # Creating disc points (initially in XY plane)
+    disc_x = [ri * cos(θi) for ri in rr, θi in θ]
+    disc_y = [ri * sin(θi) for ri in rr, θi in θ] .- 7.7
+    disc_z = zeros(size(disc_x))
+    
+    # Known galactic plane tilt (approximate)
+    tilt_angle = deg2rad(28)  
+    
+    # Rotating disc to match galactic plane tilt
+    disc_y_rot = disc_y .* cos(tilt_angle) .- disc_z .* sin(tilt_angle)
+    disc_z_rot = disc_y .* sin(tilt_angle) .+ disc_z .* cos(tilt_angle)
+    
+    # Plotting the disc
+    surface!(p, disc_x, disc_y_rot, disc_z_rot, alpha=0.5, color=:blue, legend = false )
+    
+    p  # Displaying the plot
+end
+
+# ╔═╡ fb84175b-122e-4121-8498-085810627024
+begin
+
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi,
+	    markerssize = 2,
+	    alpha = 0.3,
+	    legend = true,
+	    label = "Object",
+	    xlabel = "Galactocentric Radius (kpc)",
+	    ylabel = "Orbital Velocity (km/s)",
+	    title = "The Keplerian Orbital Curve",
+	    shape = :circle,
+	    xlims = (0, xmax),
+	    ylims = (0, 500),
+	    legendposition = :bottomright)
 
 	G = 4.302e-6  # kpc * (km/s)^2 / Msun
-	
+
 	keplerian_velocity(r, M) = sqrt(G * M / r)
-	
-	
-	### Galactic rotation curve
-	r_values = 0.1:0.1:xmax # Range of distances (kpc)
+
+	# Galactic rotation curve
+	r_values = 0.1:0.1:xmax  # Range of distances (kpc)
 	v_kepler = keplerian_velocity.(r_values, mass_slider)  # Keplerian velocity based on current mass
-	
-	### Generating scatter plot and overlaying Keplerian curve
-	
-	plot!(r_values, v_kepler, label="Keplerian Curve", legend = true, linewidth=2, color=:red)
+
+	# Overlaying Keplerian curve
+	plot!(r_values, v_kepler, label = "Keplerian Curve", linewidth = 2, color = :red)
 end
 
-# ╔═╡ 97e6ab22-be14-4b2a-9032-f5432839ac23
+
+# ╔═╡ c93a3123-22d0-4433-a6d3-34cc1395016a
 begin
 	
-	# Define the rotation curve components
-	function V_bulge(r, V0, a)
-	    return V0 * (r ./ (r.^2 .+ a^2).^(3/4))
+	# 1. Prepare the data
+	# Replace these with your actual data vectors
+	r_data = N_New.Galactocentric_Radius  # Example Galactocentric Radius data
+	v_data = N_New.V_phi  # Example Orbital Velocity data
+	
+	# Remove any invalid points
+	valid = .!(isnan.(r_data) .| isnan.(v_data))
+	r_data = r_data[valid]
+	v_data = v_data[valid]
+	
+	# Create a DataFrame
+	df = DataFrame(Radius = r_data, Velocity = v_data)
+	
+	# 2. Fit a linear regression model
+	modelLR = lm(@formula(Velocity ~ Radius), df)
+	
+	# 3. Generate predictions
+	r_plot = range(minimum(r_data), maximum(r_data), length=200)
+	df_plot = DataFrame(Radius = r_plot)
+	predictions = predict(modelLR, df_plot)
+	
+	# 4. Creating plot
+	scatter(r_data, v_data, label="Data", color=:blue, alpha=0.6,
+	        xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)",
+	        title="Linear Regression Fit", legend=:topleft)
+	
+	plot!(r_plot, predictions, label="Best-Fit Line", color=:red, lw=2)
+	
+end
+
+# ╔═╡ 1f1cab74-5f8d-4ab4-a12e-5e53a89d9080
+begin
+	# 5. Print model summary
+	println("Linear Regression Model Summary:")
+	println(coeftable(modelLR))
+end
+
+# ╔═╡ d62f9aab-db3d-49f3-9844-ed9b091903ef
+begin
+	
+	
+	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.3 , xlims=(0, x_max4), ylims=(0, 500))
+	
+
+	# Customize the plot further
+	xlabel!("Galactocentric Radius (kpc)")
+	ylabel!("Orbital Velocity (km/s)")
+	title!("A Linear Fit")
+	xlims!(0, x_max4)
+	ylims!(0, 450)
+
+	model1(x) = scaler1
+	
+	# Overlay the model curve
+	plot!(model1, 0:0.1:25, color=:red, lw=2, label="Model", xlims= (0,x_max4))
+
+end
+
+
+# ╔═╡ 6f660144-df97-46a4-b83f-48f763b6407d
+begin
+	
+	# Assuming your DataFrame is named N_New
+	# with columns Galactocentric_Radius and V_phi
+	
+	# Create the scatter plot
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi, 
+	        markersize=3, alpha=0.2, label="Data points",
+	        xlabel="Galactocentric Radius", ylabel="V_phi",
+	        title="Scatter Plot with Moving Average", xlims=(0,25), legendposition = :bottomright)
+	
+	# Calculate moving average with 0.2 bins
+	x_min = minimum(N_New.Galactocentric_Radius)
+	x_max_ = 25
+	bin_edges = x_min:0.2:x_max_
+	
+	# Initialize arrays for binned averages
+	x_bin_centers = Float64[]
+	y_means = Float64[]
+	
+	# Calculate mean for each bin
+	for i in 1:length(bin_edges)-1
+	    lower = bin_edges[i]
+	    upper = bin_edges[i+1]
+	    
+	    # Get indices of points in this bin
+	    in_bin = (N_New.Galactocentric_Radius .>= lower) .& (N_New.Galactocentric_Radius .< upper)
+	    
+	    # Only calculate if there are points in the bin
+	    if sum(in_bin) > 0
+	        push!(x_bin_centers, (lower + upper)/2)  # Center of the bin
+	        push!(y_means, mean(N_New.V_phi[in_bin]))
+	    end
 	end
 	
-	function V_disk(r, V0, R_d)
-	    return V0 * (r ./ R_d) .* exp.(-r ./ (2 * R_d))
-	end
+	# Plot the moving average
+	plot!(x_bin_centers, y_means, 
+	      linewidth=3, color=:red, label="Moving Average (bin=0.2kpc)",
+	      marker=:circle, markersize=5)
 	
-	function V_HI(r, V0, b)
-	    return V0 * (r ./ (r.^2 .+ b^2).^(1/2))
-	end
+
+end
+
+# ╔═╡ bb8551a1-8e35-49a4-8aa8-1fc89167ae7e
+begin
 	
-	function V_H2(r, V0, R_H2)
-	    return V0 * r .* exp.(-r ./ R_H2)
-	end
 	
-	function V_halo(r, V0, c)
-	    return V0 * (r ./ sqrt.(r.^2 .+ c^2))
-	end
+	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.3 , xlims=(0, x_max), ylims=(0, 500))
 	
-	# Define the range of r (distance in kpc)
+
+	# Customize the plot further
+	xlabel!("Galactocentric Radius (kpc)")
+	ylabel!("Orbital Velocity (km/s)")
+	title!("Simple Model")
+	xlims!(0, x_max)
+	ylims!(0, 450)
+
+	model(x) = scaler * (1 - exp(-0.6 * x))
+	
+	# Overlay the model curve
+	plot!(model, 0:0.1:25, color=:black, lw=2, label="Model", xlims= (0,x_max))
+
+
+	plot!(x_bin_centers, y_means, 
+	      linewidth=2, color=:red, label="Moving Average (bin=0.2kpc)",
+	      marker=:circle, markersize=2)
+end
+
+
+# ╔═╡ ddba2999-edab-4899-86d7-44c822e33ac1
+begin
+	
+	# Defining the range of r (distance in kpc)
 	r = 0:0.1:xmax_2  # 0 to user selected value for kpc
 	
-	# Parameters for the components (from the description)
-	V0_bulge = 300
-	a_bulge = 1
 	
-	V0_disk = 200
-	R_d = 3
-	
-	V0_HI = 100
-	b_HI = 5
-	
-	V0_H2 = 80
-	R_H2 = 4
-	
-	V_infinity_halo = 220
-	R_H = 20
-	c_halo = 10
-	
-	# Calculate each component
+	# Calculating each component
 	V_bulge_curve = V_bulge(r, V0_bulge, a_bulge)
 	V_disk_curve = V_disk(r, V0_disk, R_d)
 	V_HI_curve = V_HI(r, V0_HI, b_HI)
@@ -756,23 +1120,161 @@ begin
 end
 
 
-# ╔═╡ cab52545-97ed-4f3c-bbab-6e8797e5721e
+# ╔═╡ 6a9d29ad-ecb7-4f9a-a86f-7e67e658a7de
+plot_residualsFlat(N_New, r, model1)
 
+# ╔═╡ 1ad1dc9b-f12d-4e9a-8ea8-c3c85ab738c3
+plot_residualsSimple(N_New, r, model)
+
+# ╔═╡ 5e980df1-7333-4210-97c1-7aa3f0de9a67
+plot_residuals(N_New, r, V_total_curve)
+
+# ╔═╡ 50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
+
+begin
+    # Real data from Gaia analysis
+    r_data1 = N_New.Galactocentric_Radius
+    V_obs1  = N_New.V_phi
+
+    # ------------------------------------------------------------------
+
+    # Initial parameter guess (can be tuned)
+    initial_guess = [
+        200, 1.5,   # bulge
+        120, 3.0,   # disk
+        90,  4.0,   # HI
+        70,  3.5,   # H2
+        190, 15.0   # halo
+    ]
+
+    # Fit the model to real Gaia-based data
+    fit = curve_fit(rotation_model, r_data1, V_obs1, initial_guess)
+    fitted_params = fit.param
+
+    println("\n Recovered Parameters from Gaia Data:")
+    param_labels = [
+        "V0_bulge", "a_bulge", "V0_disk", "R_d",
+        "V0_HI", "b_HI", "V0_H2", "R_H2",
+        "V_infinity_halo", "c_halo"
+    ]
+    for (label, val) in zip(param_labels, fitted_params)
+        println("$label: ", round(val, digits=3))
+    end
+
+    # ------------------------------------------------------------------
+    r_grid = range(minimum(r_data1), maximum(r_data1), length = 400)
+    # ------------------------------------------------------------------
+
+    # Plot: Observed vs Fitted
+    plot(r_data1, V_obs1; label = "Observed V_phi",
+         seriestype = :scatter, alpha = 0.3, color = :gray, legendposition = :bottomright, xlims = (0,25))
+    plot!(r_grid, rotation_model(r_grid, fitted_params);
+          label = "Fitted Curve", lw = 3, color = :blue, xlims = (0,25))
+
+    xlabel!("Galactocentric Radius (kpc)")
+    ylabel!("Orbital Velocity (km/s)")
+    title!("Nonlinear Fit to Gaia-based Orbital Velocity Data")
+end
+
+
+# ╔═╡ 973f9025-3d69-4b7a-b5c4-0c8a8ee5f2a8
+begin
+	p1 = fitted_params 
+	
+	V(x) = total_rotation_curve(x, p1)
+end;
+
+# ╔═╡ 4d5dbdaa-7859-45fe-ba01-5d783400543c
+begin
+	#hideall
+	file_path1 = "DataSets/DR2Test-1745182248405O-result.csv"
+	# Load the Gaia data
+	TestFrame = CSV.read(file_path, DataFrame);
+	TestFrame[!, :d_kpc] = 1.0 ./ TestFrame.parallax
+
+	resultsTest = map(row -> compute_galactocentric_kinematics(row.ra, row.dec, row.l, row.b, row.d_kpc, row.pmra, row.pmdec, row.radial_velocity), eachrow(TestFrame))
+	
+	# Add columns to dataframe
+	TestFrame[!, :Galactocentric_Radius] = [r[1] for r in resultsTest]
+	TestFrame[!, :V_X] = [r[2] for r in resultsTest]
+	TestFrame[!, :V_Y] = [r[3] for r in resultsTest]
+	TestFrame[!, :V_Z] = [r[4] for r in resultsTest]
+	TestFrame[!, :V_phi] = [r[5] for r in resultsTest]
+	
+	# Filter 
+	TestFrameCorrected = filter(row -> row.Galactocentric_Radius > 0 && 537 > row.V_phi > 0, TestFrame)
+	
+end;
+
+# ╔═╡ d4e7f175-ae9a-40de-8c06-3005b55331fc
+begin
+	if ready_to_test == true
+	# First plot the test data as scatter
+	scatter(TestFrameCorrected.Galactocentric_Radius, TestFrameCorrected.V_phi,
+	    markersize = 2,
+	    alpha = 0.2,
+	    label = "Test Objects",
+	    xlabel = "Galactocentric Radius (kpc)",
+	    ylabel = "Orbital Velocity (km/s)",
+	    title = "Training Curve vs Test Data 🚀",
+	    shape = :circle,
+	    xlims = (0, 25),
+	    ylims = (0, 500),
+	    legend = true,
+	    legendposition = :bottomright)
+	
+	# Now overlaying the theoretical/model velocity curve
+	r_vals = range(0.1, stop=30.0, length=300)
+	v_vals = V.(r_vals)  # assuming V is your model velocity function
+	
+	plot!(r_vals, v_vals,
+	    label = "Model Curve",
+	    linewidth = 2,
+	    linecolor = :black)
+	else
+	end
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
+Interact = "c601a237-2ae4-5e1e-952c-7a85b0c7eef1"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+KernelDensity = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+Loess = "4345ca2d-374a-55d4-8d30-97f9976e7612"
+LsqFit = "2fda8390-95c7-5789-9bda-21331edee243"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [compat]
 CSV = "~0.10.15"
+ColorSchemes = "~3.29.0"
 DataFrames = "~1.7.0"
+Distributions = "~0.25.117"
+GLM = "~1.9.0"
+Interact = "~0.10.5"
+Interpolations = "~0.15.1"
+KernelDensity = "~0.6.9"
+LaTeXStrings = "~1.4.0"
+Loess = "~0.6.4"
+LsqFit = "~0.15.1"
+Optim = "~1.10.0"
 Plots = "~1.40.9"
 PlutoUI = "~0.7.61"
+Polynomials = "~4.0.19"
+Statistics = "~1.11.1"
+StatsPlots = "~0.15.7"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -781,13 +1283,35 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "be16dec2fa4888e8a973ae01bc825fbb8c39170c"
+project_hash = "8b3f89498e9fcad0eee888ecdb6e72fb573e5e9d"
+
+[[deps.AbstractFFTs]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "d92ad398961a3ed262d8bf04a1a2b8340f915fef"
+uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
+version = "1.5.0"
+weakdeps = ["ChainRulesCore", "Test"]
+
+    [deps.AbstractFFTs.extensions]
+    AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
+    AbstractFFTsTestExt = "Test"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
 git-tree-sha1 = "6e1d2a35f2f90a4bc7c2ed98079b2ba09c35b83a"
 uuid = "6e696c72-6542-2067-7265-42206c756150"
 version = "1.3.2"
+
+[[deps.Adapt]]
+deps = ["LinearAlgebra", "Requires"]
+git-tree-sha1 = "cd8b948862abee8f3d3e9b73a102a9ca924debb0"
+uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+version = "4.2.0"
+weakdeps = ["SparseArrays", "StaticArrays"]
+
+    [deps.Adapt.extensions]
+    AdaptSparseArraysExt = "SparseArrays"
+    AdaptStaticArraysExt = "StaticArrays"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -799,9 +1323,65 @@ version = "1.1.3"
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 version = "1.1.2"
 
+[[deps.Arpack]]
+deps = ["Arpack_jll", "Libdl", "LinearAlgebra", "Logging"]
+git-tree-sha1 = "9b9b347613394885fd1c8c7729bfc60528faa436"
+uuid = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
+version = "0.5.4"
+
+[[deps.Arpack_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "OpenBLAS_jll", "Pkg"]
+git-tree-sha1 = "5ba6c757e8feccf03a1554dfaf3e26b3cfc7fd5e"
+uuid = "68821587-b530-5797-8361-c406ea357684"
+version = "3.5.1+1"
+
+[[deps.ArrayInterface]]
+deps = ["Adapt", "LinearAlgebra"]
+git-tree-sha1 = "017fcb757f8e921fb44ee063a7aafe5f89b86dd1"
+uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+version = "7.18.0"
+
+    [deps.ArrayInterface.extensions]
+    ArrayInterfaceBandedMatricesExt = "BandedMatrices"
+    ArrayInterfaceBlockBandedMatricesExt = "BlockBandedMatrices"
+    ArrayInterfaceCUDAExt = "CUDA"
+    ArrayInterfaceCUDSSExt = "CUDSS"
+    ArrayInterfaceChainRulesCoreExt = "ChainRulesCore"
+    ArrayInterfaceChainRulesExt = "ChainRules"
+    ArrayInterfaceGPUArraysCoreExt = "GPUArraysCore"
+    ArrayInterfaceReverseDiffExt = "ReverseDiff"
+    ArrayInterfaceSparseArraysExt = "SparseArrays"
+    ArrayInterfaceStaticArraysCoreExt = "StaticArraysCore"
+    ArrayInterfaceTrackerExt = "Tracker"
+
+    [deps.ArrayInterface.weakdeps]
+    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+    BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
+    ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.11.0"
+
+[[deps.AssetRegistry]]
+deps = ["Distributed", "JSON", "Pidfile", "SHA", "Test"]
+git-tree-sha1 = "b25e88db7944f98789130d7b503276bc34bc098e"
+uuid = "bf4720bc-e11a-5d0c-854e-bdca1663c893"
+version = "0.1.0"
+
+[[deps.AxisAlgorithms]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "WoodburyMatrices"]
+git-tree-sha1 = "01b8ccb13d68535d73d2b0c23e39bd23155fb712"
+uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
+version = "1.1.0"
 
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -818,6 +1398,12 @@ git-tree-sha1 = "1b96ea4a01afe0ea4090c5c8039690672dd13f2e"
 uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
 version = "1.0.9+0"
 
+[[deps.CSSUtil]]
+deps = ["Colors", "JSON", "Markdown", "Measures", "WebIO"]
+git-tree-sha1 = "b9fb4b464ec10e860abe251b91d4d049934f7399"
+uuid = "70588ee8-6100-5070-97c1-3cb50ed05fe8"
+version = "0.1.1"
+
 [[deps.CSV]]
 deps = ["CodecZlib", "Dates", "FilePathsBase", "InlineStrings", "Mmap", "Parsers", "PooledArrays", "PrecompileTools", "SentinelArrays", "Tables", "Unicode", "WeakRefStrings", "WorkerUtilities"]
 git-tree-sha1 = "deddd8725e5e1cc49ee205a1964256043720a6c3"
@@ -826,9 +1412,25 @@ version = "0.10.15"
 
 [[deps.Cairo_jll]]
 deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
-git-tree-sha1 = "009060c9a6168704143100f36ab08f06c2af4642"
+git-tree-sha1 = "2ac646d71d0d24b44f3f8c84da8c9f4d70fb67df"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
-version = "1.18.2+1"
+version = "1.18.4+0"
+
+[[deps.ChainRulesCore]]
+deps = ["Compat", "LinearAlgebra"]
+git-tree-sha1 = "1713c74e00545bfe14605d2a2be1712de8fbcb58"
+uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+version = "1.25.1"
+weakdeps = ["SparseArrays"]
+
+    [deps.ChainRulesCore.extensions]
+    ChainRulesCoreSparseArraysExt = "SparseArrays"
+
+[[deps.Clustering]]
+deps = ["Distances", "LinearAlgebra", "NearestNeighbors", "Printf", "Random", "SparseArrays", "Statistics", "StatsBase"]
+git-tree-sha1 = "3e22db924e2945282e70c33b75d4dde8bfa44c94"
+uuid = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
+version = "0.15.8"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -853,18 +1455,22 @@ deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "Requires", "Statist
 git-tree-sha1 = "a1f44953f2382ebb937d60dafbe2deea4bd23249"
 uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
 version = "0.10.0"
+weakdeps = ["SpecialFunctions"]
 
     [deps.ColorVectorSpace.extensions]
     SpecialFunctionsExt = "SpecialFunctions"
 
-    [deps.ColorVectorSpace.weakdeps]
-    SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
-
 [[deps.Colors]]
 deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
-git-tree-sha1 = "64e15186f0aa277e174aa81798f7eb8598e0157e"
+git-tree-sha1 = "362a287c3aa50601b0bc359053d5c2468f0e7ce0"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
-version = "0.13.0"
+version = "0.12.11"
+
+[[deps.CommonSubexpressions]]
+deps = ["MacroTools"]
+git-tree-sha1 = "cda2cfaebb4be89c9084adaca7dd7333369715c5"
+uuid = "bbf7d656-a473-5ed7-a52c-81e309532950"
+version = "0.3.1"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -886,6 +1492,21 @@ deps = ["Serialization", "Sockets"]
 git-tree-sha1 = "d9d26935a0bcffc87d2613ce14c527c99fc543fd"
 uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
 version = "2.5.0"
+
+[[deps.ConstructionBase]]
+git-tree-sha1 = "76219f1ed5771adbb096743bff43fb5fdd4c1157"
+uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+version = "1.5.8"
+
+    [deps.ConstructionBase.extensions]
+    ConstructionBaseIntervalSetsExt = "IntervalSets"
+    ConstructionBaseLinearAlgebraExt = "LinearAlgebra"
+    ConstructionBaseStaticArraysExt = "StaticArrays"
+
+    [deps.ConstructionBase.weakdeps]
+    IntervalSets = "8197267c-284f-5f27-9208-e0e47529a953"
+    LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [[deps.Contour]]
 git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
@@ -910,9 +1531,9 @@ version = "1.7.0"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
-git-tree-sha1 = "1d0a14036acb104d9e89698bd408f63ab58cdc82"
+git-tree-sha1 = "4e1fe97fdaed23e9dc21d4d664bea76b65fc50a0"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.18.20"
+version = "0.18.22"
 
 [[deps.DataValueInterfaces]]
 git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
@@ -936,11 +1557,54 @@ git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 version = "1.9.1"
 
+[[deps.DiffResults]]
+deps = ["StaticArraysCore"]
+git-tree-sha1 = "782dd5f4561f5d267313f23853baaaa4c52ea621"
+uuid = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
+version = "1.1.0"
+
+[[deps.DiffRules]]
+deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialFunctions"]
+git-tree-sha1 = "23163d55f885173722d1e4cf0f6110cdbaf7e272"
+uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
+version = "1.15.1"
+
+[[deps.Distances]]
+deps = ["LinearAlgebra", "Statistics", "StatsAPI"]
+git-tree-sha1 = "c7e3a542b999843086e2f29dac96a618c105be1d"
+uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+version = "0.10.12"
+weakdeps = ["ChainRulesCore", "SparseArrays"]
+
+    [deps.Distances.extensions]
+    DistancesChainRulesCoreExt = "ChainRulesCore"
+    DistancesSparseArraysExt = "SparseArrays"
+
+[[deps.Distributed]]
+deps = ["Random", "Serialization", "Sockets"]
+uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+version = "1.11.0"
+
+[[deps.Distributions]]
+deps = ["AliasTables", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
+git-tree-sha1 = "03aa5d44647eaec98e1920635cdfed5d5560a8b9"
+uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
+version = "0.25.117"
+
+    [deps.Distributions.extensions]
+    DistributionsChainRulesCoreExt = "ChainRulesCore"
+    DistributionsDensityInterfaceExt = "DensityInterface"
+    DistributionsTestExt = "Test"
+
+    [deps.Distributions.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
 [[deps.DocStringExtensions]]
-deps = ["LibGit2"]
-git-tree-sha1 = "2fb1e02f2b635d0845df5d7c167fec4dd739b00d"
+git-tree-sha1 = "e7b7e6f178525d17c720ab9c081e4ef04429f860"
 uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
-version = "0.9.3"
+version = "0.9.4"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
@@ -977,6 +1641,18 @@ git-tree-sha1 = "466d45dc38e15794ec7d5d63ec03d776a9aff36e"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "4.4.4+1"
 
+[[deps.FFTW]]
+deps = ["AbstractFFTs", "FFTW_jll", "LinearAlgebra", "MKL_jll", "Preferences", "Reexport"]
+git-tree-sha1 = "7de7c78d681078f027389e067864a8d53bd7c3c9"
+uuid = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+version = "1.8.1"
+
+[[deps.FFTW_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "4d81ed14783ec49ce9f2e168208a12ce1815aa25"
+uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
+version = "3.3.10+3"
+
 [[deps.FilePathsBase]]
 deps = ["Compat", "Dates"]
 git-tree-sha1 = "3bab2c5aa25e7840a4b065805c0cdfc01f3068d2"
@@ -992,6 +1668,36 @@ weakdeps = ["Mmap", "Test"]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 version = "1.11.0"
 
+[[deps.FillArrays]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "6a70198746448456524cb442b8af316927ff3e1a"
+uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
+version = "1.13.0"
+weakdeps = ["PDMats", "SparseArrays", "Statistics"]
+
+    [deps.FillArrays.extensions]
+    FillArraysPDMatsExt = "PDMats"
+    FillArraysSparseArraysExt = "SparseArrays"
+    FillArraysStatisticsExt = "Statistics"
+
+[[deps.FiniteDiff]]
+deps = ["ArrayInterface", "LinearAlgebra", "Setfield"]
+git-tree-sha1 = "f089ab1f834470c525562030c8cfde4025d5e915"
+uuid = "6a86dc24-6348-571c-b903-95158fe2bd41"
+version = "2.27.0"
+
+    [deps.FiniteDiff.extensions]
+    FiniteDiffBandedMatricesExt = "BandedMatrices"
+    FiniteDiffBlockBandedMatricesExt = "BlockBandedMatrices"
+    FiniteDiffSparseArraysExt = "SparseArrays"
+    FiniteDiffStaticArraysExt = "StaticArrays"
+
+    [deps.FiniteDiff.weakdeps]
+    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+    BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
 git-tree-sha1 = "05882d6995ae5c12bb5f36dd2ed3f61c98cbb172"
@@ -1000,26 +1706,42 @@ version = "0.8.5"
 
 [[deps.Fontconfig_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Expat_jll", "FreeType2_jll", "JLLWrappers", "Libdl", "Libuuid_jll", "Zlib_jll"]
-git-tree-sha1 = "21fac3c77d7b5a9fc03b0ec503aa1a6392c34d2b"
+git-tree-sha1 = "301b5d5d731a0654825f1f2e906990f7141a106b"
 uuid = "a3f928ae-7b40-5064-980b-68af3947d34b"
-version = "2.15.0+0"
+version = "2.16.0+0"
 
 [[deps.Format]]
 git-tree-sha1 = "9c68794ef81b08086aeb32eeaf33531668d5f5fc"
 uuid = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8"
 version = "1.3.7"
 
+[[deps.ForwardDiff]]
+deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "LogExpFunctions", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions"]
+git-tree-sha1 = "a2df1b776752e3f344e5116c06d75a10436ab853"
+uuid = "f6369f11-7733-5829-9624-2563aa707210"
+version = "0.10.38"
+weakdeps = ["StaticArrays"]
+
+    [deps.ForwardDiff.extensions]
+    ForwardDiffStaticArraysExt = "StaticArrays"
+
 [[deps.FreeType2_jll]]
 deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "786e968a8d2fb167f2e4880baba62e0e26bd8e4e"
+git-tree-sha1 = "2c5512e11c791d1baed2049c5652441b28fc6a31"
 uuid = "d7e528f0-a631-5988-bf34-fe36492bcfd7"
-version = "2.13.3+1"
+version = "2.13.4+0"
 
 [[deps.FriBidi_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "846f7026a9decf3679419122b49f8a1fdb48d2d5"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.16+0"
+
+[[deps.FunctionalCollections]]
+deps = ["Test"]
+git-tree-sha1 = "04cb9cfaa6ba5311973994fe3496ddec19b6292a"
+uuid = "de31a74c-ac4f-5751-b3fd-e18cd04993ca"
+version = "0.5.0"
 
 [[deps.Future]]
 deps = ["Random"]
@@ -1031,6 +1753,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Xorg_libXcursor_jl
 git-tree-sha1 = "fcb0584ff34e25155876418979d4c8971243bb89"
 uuid = "0656b61e-2033-5cc2-a64a-77c0f6c09b89"
 version = "3.4.0+2"
+
+[[deps.GLM]]
+deps = ["Distributions", "LinearAlgebra", "Printf", "Reexport", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "StatsModels"]
+git-tree-sha1 = "273bd1cd30768a2fddfa3fd63bbc746ed7249e5f"
+uuid = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
+version = "1.9.0"
 
 [[deps.GR]]
 deps = ["Artifacts", "Base64", "DelimitedFiles", "Downloads", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Preferences", "Printf", "Qt6Wayland_jll", "Random", "Serialization", "Sockets", "TOML", "Tar", "Test", "p7zip_jll"]
@@ -1057,10 +1785,10 @@ uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
 version = "2.82.4+0"
 
 [[deps.Graphite2_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "01979f9b37367603e2848ea225918a3b3861b606"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8a6dbda1fd736d60cc477d99f2e7a042acfa46e8"
 uuid = "3b182d85-2403-5c21-9c21-1e1f0cc25472"
-version = "1.3.14+1"
+version = "1.3.15+0"
 
 [[deps.Grisu]]
 git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
@@ -1078,6 +1806,12 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "55c53be97790242c29031e5cd45e8ac296dadda3"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "8.5.0+0"
+
+[[deps.HypergeometricFunctions]]
+deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
+git-tree-sha1 = "2bd56245074fab4015b9174f24ceba8293209053"
+uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
+version = "0.3.27"
 
 [[deps.Hyperscript]]
 deps = ["Test"]
@@ -1110,10 +1844,38 @@ version = "1.4.3"
     ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
     Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 
+[[deps.IntelOpenMP_jll]]
+deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
+git-tree-sha1 = "0f14a5456bdc6b9731a5682f439a672750a09e48"
+uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
+version = "2025.0.4+0"
+
+[[deps.Interact]]
+deps = ["CSSUtil", "InteractBase", "JSON", "Knockout", "Observables", "OrderedCollections", "Reexport", "WebIO", "Widgets"]
+git-tree-sha1 = "c5091992248c7134af7c90554305c600d5d9012b"
+uuid = "c601a237-2ae4-5e1e-952c-7a85b0c7eef1"
+version = "0.10.5"
+
+[[deps.InteractBase]]
+deps = ["Base64", "CSSUtil", "Colors", "Dates", "JSExpr", "JSON", "Knockout", "Observables", "OrderedCollections", "Random", "WebIO", "Widgets"]
+git-tree-sha1 = "aa5daeff326db0a9126a225b58ca04ae12f57259"
+uuid = "d3863d7c-f0c8-5437-a7b4-3ae773c01009"
+version = "0.10.10"
+
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 version = "1.11.0"
+
+[[deps.Interpolations]]
+deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
+git-tree-sha1 = "88a101217d7cb38a7b481ccd50d21876e1d1b0e0"
+uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+version = "0.15.1"
+weakdeps = ["Unitful"]
+
+    [deps.Interpolations.extensions]
+    InterpolationsUnitfulExt = "Unitful"
 
 [[deps.InvertedIndices]]
 git-tree-sha1 = "6da3c4316095de0f5ee2ebd875df8721e7e0bdbe"
@@ -1131,16 +1893,22 @@ uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
 
 [[deps.JLFzf]]
-deps = ["Pipe", "REPL", "Random", "fzf_jll"]
-git-tree-sha1 = "71b48d857e86bf7a1838c4736545699974ce79a2"
+deps = ["REPL", "Random", "fzf_jll"]
+git-tree-sha1 = "1d4015b1eb6dc3be7e6c400fbd8042fe825a6bac"
 uuid = "1019f520-868f-41f5-a6de-eb00f4b6a39c"
-version = "0.1.9"
+version = "0.1.10"
 
 [[deps.JLLWrappers]]
 deps = ["Artifacts", "Preferences"]
 git-tree-sha1 = "a007feb38b422fbdab534406aeca1b86823cb4d6"
 uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
 version = "1.7.0"
+
+[[deps.JSExpr]]
+deps = ["JSON", "MacroTools", "Observables", "WebIO"]
+git-tree-sha1 = "b413a73785b98474d8af24fd4c8a975e31df3658"
+uuid = "97c1335a-c9c5-57fe-bc5d-ec35cebe8660"
+version = "0.5.4"
 
 [[deps.JSON]]
 deps = ["Dates", "Mmap", "Parsers", "Unicode"]
@@ -1153,6 +1921,18 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "eac1206917768cb54957c65a615460d87b455fc1"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "3.1.1+0"
+
+[[deps.KernelDensity]]
+deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
+git-tree-sha1 = "7d703202e65efa1369de1279c162b915e245eed1"
+uuid = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
+version = "0.6.9"
+
+[[deps.Knockout]]
+deps = ["JSExpr", "JSON", "Observables", "Test", "WebIO"]
+git-tree-sha1 = "91835de56d816864f1c38fb5e3fad6eb1e741271"
+uuid = "bcebb21b-c2e3-54f8-a781-646b90f6d2cc"
+version = "0.2.6"
 
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1199,6 +1979,11 @@ version = "0.16.6"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
 
+[[deps.LazyArtifacts]]
+deps = ["Artifacts", "Pkg"]
+uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
+version = "1.11.0"
+
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
@@ -1236,9 +2021,9 @@ version = "3.2.2+2"
 
 [[deps.Libgcrypt_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libgpg_error_jll"]
-git-tree-sha1 = "8be878062e0ffa2c3f67bb58a595375eda5de80b"
+git-tree-sha1 = "d77592fa54ad343c5043b6f38a03f1a3c3959ffe"
 uuid = "d4300ac3-e22c-5743-9152-c294e39db1e4"
-version = "1.11.0+0"
+version = "1.11.1+0"
 
 [[deps.Libglvnd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll", "Xorg_libXext_jll"]
@@ -1260,9 +2045,9 @@ version = "1.18.0+0"
 
 [[deps.Libmount_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "89211ea35d9df5831fca5d33552c02bd33878419"
+git-tree-sha1 = "a31572773ac1b745e0343fe5e2c8ddda7a37e997"
 uuid = "4b2f31a3-9ecc-558c-b454-b3730dcb73e9"
-version = "2.40.3+0"
+version = "2.41.0+0"
 
 [[deps.Libtiff_jll]]
 deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "LERC_jll", "Libdl", "XZ_jll", "Zlib_jll", "Zstd_jll"]
@@ -1272,14 +2057,26 @@ version = "4.7.1+0"
 
 [[deps.Libuuid_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "e888ad02ce716b319e6bdb985d2ef300e7089889"
+git-tree-sha1 = "321ccef73a96ba828cd51f2ab5b9f917fa73945a"
 uuid = "38a345b3-de98-5d2b-a5d3-14cd9215e700"
-version = "2.40.3+0"
+version = "2.41.0+0"
+
+[[deps.LineSearches]]
+deps = ["LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "Printf"]
+git-tree-sha1 = "e4c3be53733db1051cc15ecf573b1042b3a712a1"
+uuid = "d3d80556-e9d4-5f37-9878-2ab0fcc64255"
+version = "7.3.0"
 
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 version = "1.11.0"
+
+[[deps.Loess]]
+deps = ["Distances", "LinearAlgebra", "Statistics", "StatsAPI"]
+git-tree-sha1 = "f749e7351f120b3566e5923fefdf8e52ba5ec7f9"
+uuid = "4345ca2d-374a-55d4-8d30-97f9976e7612"
+version = "0.6.4"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
@@ -1307,10 +2104,22 @@ git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.1.0"
 
+[[deps.LsqFit]]
+deps = ["Distributions", "ForwardDiff", "LinearAlgebra", "NLSolversBase", "Printf", "StatsAPI"]
+git-tree-sha1 = "f386224fa41af0c27f45e2f9a8f323e538143b43"
+uuid = "2fda8390-95c7-5789-9bda-21331edee243"
+version = "0.15.1"
+
 [[deps.MIMEs]]
-git-tree-sha1 = "1833212fd6f580c20d4291da9c1b4e8a655b128e"
+git-tree-sha1 = "c64d943587f7187e751162b3b84445bbbd79f691"
 uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
-version = "1.0.0"
+version = "1.1.0"
+
+[[deps.MKL_jll]]
+deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
+git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
+uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
+version = "2025.0.1+1"
 
 [[deps.MacroTools]]
 git-tree-sha1 = "72aebe0b5051e5143a079a4685a46da330a40472"
@@ -1352,15 +2161,47 @@ version = "1.11.0"
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 version = "2023.12.12"
 
+[[deps.MultivariateStats]]
+deps = ["Arpack", "Distributions", "LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI", "StatsBase"]
+git-tree-sha1 = "816620e3aac93e5b5359e4fdaf23ca4525b00ddf"
+uuid = "6f286f6a-111f-5878-ab1e-185364afe411"
+version = "0.10.3"
+
+[[deps.NLSolversBase]]
+deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
+git-tree-sha1 = "a0b464d183da839699f4c79e7606d9d186ec172c"
+uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
+version = "7.8.3"
+
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
 git-tree-sha1 = "cc0a5deefdb12ab3a096f00a6d42133af4560d71"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "1.1.2"
 
+[[deps.NearestNeighbors]]
+deps = ["Distances", "StaticArrays"]
+git-tree-sha1 = "8a3271d8309285f4db73b4f662b1b290c715e85e"
+uuid = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
+version = "0.4.21"
+
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
+
+[[deps.Observables]]
+git-tree-sha1 = "7438a59546cf62428fc9d1bc94729146d37a7225"
+uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
+version = "0.5.5"
+
+[[deps.OffsetArrays]]
+git-tree-sha1 = "5e1897147d1ff8d98883cda2be2187dcf57d8f0c"
+uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+version = "1.15.0"
+weakdeps = ["Adapt"]
+
+    [deps.OffsetArrays.extensions]
+    OffsetArraysAdaptExt = "Adapt"
 
 [[deps.Ogg_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1390,6 +2231,24 @@ git-tree-sha1 = "a9697f1d06cc3eb3fb3ad49cc67f2cfabaac31ea"
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
 version = "3.0.16+0"
 
+[[deps.OpenSpecFun_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "1346c9208249809840c91b26703912dff463d335"
+uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
+version = "0.5.6+0"
+
+[[deps.Optim]]
+deps = ["Compat", "FillArrays", "ForwardDiff", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "PositiveFactorizations", "Printf", "SparseArrays", "StatsBase"]
+git-tree-sha1 = "ab7edad78cdef22099f43c54ef77ac63c2c9cc64"
+uuid = "429524aa-4258-5aef-a3af-852621145aeb"
+version = "1.10.0"
+
+    [deps.Optim.extensions]
+    OptimMOIExt = "MathOptInterface"
+
+    [deps.Optim.weakdeps]
+    MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
+
 [[deps.Opus_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "6703a85cb3781bd5909d48730a67205f3f31a575"
@@ -1406,11 +2265,23 @@ deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
 version = "10.42.0+1"
 
+[[deps.PDMats]]
+deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
+git-tree-sha1 = "966b85253e959ea89c53a9abebbf2e964fbf593b"
+uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
+version = "0.11.32"
+
 [[deps.Pango_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "3b31172c032a1def20c98dae3f2cdc9d10e3b561"
 uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
 version = "1.56.1+0"
+
+[[deps.Parameters]]
+deps = ["OrderedCollections", "UnPack"]
+git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
+uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+version = "0.12.3"
 
 [[deps.Parsers]]
 deps = ["Dates", "PrecompileTools", "UUIDs"]
@@ -1418,16 +2289,17 @@ git-tree-sha1 = "8489905bcdbcfac64d1daa51ca07c0d8f0283821"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 version = "2.8.1"
 
-[[deps.Pipe]]
-git-tree-sha1 = "6842804e7867b115ca9de748a0cf6b364523c16d"
-uuid = "b98c9c47-44ae-5843-9183-064241ee97a0"
+[[deps.Pidfile]]
+deps = ["FileWatching", "Test"]
+git-tree-sha1 = "2d8aaf8ee10df53d0dfb9b8ee44ae7c04ced2b03"
+uuid = "fa939f87-e72e-5be4-a000-7fc836dbe307"
 version = "1.3.0"
 
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl"]
-git-tree-sha1 = "35621f10a7531bc8fa58f74610b1bfb70a3cfc6b"
+git-tree-sha1 = "db76b1ecd5e9715f3d043cec13b2ec93ce015d53"
 uuid = "30392449-352a-5448-841d-b1acce4e97dc"
-version = "0.43.4+0"
+version = "0.44.2+0"
 
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
@@ -1476,11 +2348,35 @@ git-tree-sha1 = "7e71a55b87222942f0f9337be62e26b1f103d3e4"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 version = "0.7.61"
 
+[[deps.Polynomials]]
+deps = ["LinearAlgebra", "OrderedCollections", "RecipesBase", "Requires", "Setfield", "SparseArrays"]
+git-tree-sha1 = "555c272d20fc80a2658587fb9bbda60067b93b7c"
+uuid = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+version = "4.0.19"
+
+    [deps.Polynomials.extensions]
+    PolynomialsChainRulesCoreExt = "ChainRulesCore"
+    PolynomialsFFTWExt = "FFTW"
+    PolynomialsMakieCoreExt = "MakieCore"
+    PolynomialsMutableArithmeticsExt = "MutableArithmetics"
+
+    [deps.Polynomials.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+    MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
+    MutableArithmetics = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
+
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
 git-tree-sha1 = "36d8b4b899628fb92c2749eb488d884a926614d3"
 uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
 version = "1.4.3"
+
+[[deps.PositiveFactorizations]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "17275485f373e6673f7e7f97051f703ed5b15b20"
+uuid = "85a6dd25-e78a-55b7-8502-1745935b8125"
+version = "0.2.4"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
@@ -1534,6 +2430,18 @@ git-tree-sha1 = "729927532d48cf79f49070341e1d918a65aba6b0"
 uuid = "e99dba38-086e-5de3-a5b1-6e4c66e897c3"
 version = "6.7.1+1"
 
+[[deps.QuadGK]]
+deps = ["DataStructures", "LinearAlgebra"]
+git-tree-sha1 = "9da16da70037ba9d701192e27befedefb91ec284"
+uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+version = "2.11.2"
+
+    [deps.QuadGK.extensions]
+    QuadGKEnzymeExt = "Enzyme"
+
+    [deps.QuadGK.weakdeps]
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
 [[deps.REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
@@ -1543,6 +2451,16 @@ version = "1.11.0"
 deps = ["SHA"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 version = "1.11.0"
+
+[[deps.Ratios]]
+deps = ["Requires"]
+git-tree-sha1 = "1342a47bf3260ee108163042310d26f2be5ec90b"
+uuid = "c84ed2f1-dad5-54f0-aa8e-dbefe2724439"
+version = "0.4.5"
+weakdeps = ["FixedPointNumbers"]
+
+    [deps.Ratios.extensions]
+    RatiosFixedPointNumbersExt = "FixedPointNumbers"
 
 [[deps.RecipesBase]]
 deps = ["PrecompileTools"]
@@ -1573,6 +2491,18 @@ git-tree-sha1 = "62389eeff14780bfe55195b7204c0d8738436d64"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.3.1"
 
+[[deps.Rmath]]
+deps = ["Random", "Rmath_jll"]
+git-tree-sha1 = "852bd0f55565a9e973fcfee83a84413270224dc4"
+uuid = "79098fc4-a85e-5d69-aa6a-4863f24498fa"
+version = "0.8.0"
+
+[[deps.Rmath_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "58cdd8fb2201a6267e1db87ff148dd6c1dbd8ad8"
+uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
+version = "0.5.1+0"
+
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 version = "0.7.0"
@@ -1592,6 +2522,22 @@ version = "1.4.8"
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 version = "1.11.0"
+
+[[deps.Setfield]]
+deps = ["ConstructionBase", "Future", "MacroTools", "StaticArraysCore"]
+git-tree-sha1 = "c5391c6ace3bc430ca630251d02ea9687169ca68"
+uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+version = "1.1.2"
+
+[[deps.SharedArrays]]
+deps = ["Distributed", "Mmap", "Random", "Serialization"]
+uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
+version = "1.11.0"
+
+[[deps.ShiftedArrays]]
+git-tree-sha1 = "503688b59397b3307443af35cd953a13e8005c16"
+uuid = "1277b4bf-5013-50f5-be3d-901d8477a67a"
+version = "2.0.0"
 
 [[deps.Showoff]]
 deps = ["Dates", "Grisu"]
@@ -1619,11 +2565,37 @@ deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 version = "1.11.0"
 
+[[deps.SpecialFunctions]]
+deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
+git-tree-sha1 = "64cca0c26b4f31ba18f13f6c12af7c85f478cfde"
+uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
+version = "2.5.0"
+weakdeps = ["ChainRulesCore"]
+
+    [deps.SpecialFunctions.extensions]
+    SpecialFunctionsChainRulesCoreExt = "ChainRulesCore"
+
 [[deps.StableRNGs]]
 deps = ["Random"]
 git-tree-sha1 = "83e6cce8324d49dfaf9ef059227f91ed4441a8e5"
 uuid = "860ef19b-820b-49d6-a774-d7a799459cd3"
 version = "1.0.2"
+
+[[deps.StaticArrays]]
+deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
+git-tree-sha1 = "0feb6b9031bd5c51f9072393eb5ab3efd31bf9e4"
+uuid = "90137ffa-7385-5640-81b9-e52037218182"
+version = "1.9.13"
+weakdeps = ["ChainRulesCore", "Statistics"]
+
+    [deps.StaticArrays.extensions]
+    StaticArraysChainRulesCoreExt = "ChainRulesCore"
+    StaticArraysStatisticsExt = "Statistics"
+
+[[deps.StaticArraysCore]]
+git-tree-sha1 = "192954ef1208c7019899fbf8049e717f92959682"
+uuid = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
+version = "1.4.3"
 
 [[deps.Statistics]]
 deps = ["LinearAlgebra"]
@@ -1647,6 +2619,32 @@ git-tree-sha1 = "29321314c920c26684834965ec2ce0dacc9cf8e5"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.34.4"
 
+[[deps.StatsFuns]]
+deps = ["HypergeometricFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
+git-tree-sha1 = "b423576adc27097764a90e163157bcfc9acf0f46"
+uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
+version = "1.3.2"
+
+    [deps.StatsFuns.extensions]
+    StatsFunsChainRulesCoreExt = "ChainRulesCore"
+    StatsFunsInverseFunctionsExt = "InverseFunctions"
+
+    [deps.StatsFuns.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
+
+[[deps.StatsModels]]
+deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Printf", "REPL", "ShiftedArrays", "SparseArrays", "StatsAPI", "StatsBase", "StatsFuns", "Tables"]
+git-tree-sha1 = "9022bcaa2fc1d484f1326eaa4db8db543ca8c66d"
+uuid = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
+version = "0.7.4"
+
+[[deps.StatsPlots]]
+deps = ["AbstractFFTs", "Clustering", "DataStructures", "Distributions", "Interpolations", "KernelDensity", "LinearAlgebra", "MultivariateStats", "NaNMath", "Observables", "Plots", "RecipesBase", "RecipesPipeline", "Reexport", "StatsBase", "TableOperations", "Tables", "Widgets"]
+git-tree-sha1 = "3b1dcbf62e469a67f6733ae493401e53d92ff543"
+uuid = "f3b207a7-027a-5e70-b257-86293d7955fd"
+version = "0.15.7"
+
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
 git-tree-sha1 = "725421ae8e530ec29bcbdddbe91ff8053421d023"
@@ -1657,6 +2655,10 @@ version = "0.4.1"
 uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 version = "1.11.0"
 
+[[deps.SuiteSparse]]
+deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
+uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
+
 [[deps.SuiteSparse_jll]]
 deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
@@ -1666,6 +2668,12 @@ version = "7.7.0+0"
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 version = "1.0.3"
+
+[[deps.TableOperations]]
+deps = ["SentinelArrays", "Tables", "Test"]
+git-tree-sha1 = "e383c87cf2a1dc41fa30c093b2a19877c83e1bc1"
+uuid = "ab02a1b2-a7df-11e8-156e-fb1833f50b87"
+version = "1.2.0"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -1706,14 +2714,19 @@ uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
 version = "0.1.10"
 
 [[deps.URIs]]
-git-tree-sha1 = "67db6cc7b3821e19ebe75791a9dd19c9b1188f2b"
+git-tree-sha1 = "cbbebadbcc76c5ca1cc4b4f3b0614b3e603b5000"
 uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
-version = "1.5.1"
+version = "1.5.2"
 
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 version = "1.11.0"
+
+[[deps.UnPack]]
+git-tree-sha1 = "387c1f73762231e86e0c9c5443ce3b4a0a9a0c2b"
+uuid = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+version = "1.0.2"
 
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
@@ -1773,6 +2786,30 @@ deps = ["DataAPI", "InlineStrings", "Parsers"]
 git-tree-sha1 = "b1be2855ed9ed8eac54e5caff2afcdb442d52c23"
 uuid = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
 version = "1.4.2"
+
+[[deps.WebIO]]
+deps = ["AssetRegistry", "Base64", "Distributed", "FunctionalCollections", "JSON", "Logging", "Observables", "Pkg", "Random", "Requires", "Sockets", "UUIDs", "WebSockets", "Widgets"]
+git-tree-sha1 = "0eef0765186f7452e52236fa42ca8c9b3c11c6e3"
+uuid = "0f1e0344-ec1d-5b48-a673-e5cf874b6c29"
+version = "0.8.21"
+
+[[deps.WebSockets]]
+deps = ["Base64", "Dates", "HTTP", "Logging", "Sockets"]
+git-tree-sha1 = "4162e95e05e79922e44b9952ccbc262832e4ad07"
+uuid = "104b5d7c-a370-577a-8038-80a2059c5097"
+version = "1.6.0"
+
+[[deps.Widgets]]
+deps = ["Colors", "Dates", "Observables", "OrderedCollections"]
+git-tree-sha1 = "e9aeb174f95385de31e70bd15fa066a505ea82b9"
+uuid = "cc8bc4a8-27d6-5769-a93b-9d913e69aa62"
+version = "0.6.7"
+
+[[deps.WoodburyMatrices]]
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "c1a7aa6219628fcd757dede0ca95e245c5cd9511"
+uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
+version = "1.0.0"
 
 [[deps.WorkerUtilities]]
 git-tree-sha1 = "cd1659ba0d57b71a464a29e64dbc67cfe83d54e7"
@@ -1937,9 +2974,9 @@ version = "2.39.0+0"
 
 [[deps.Xorg_xtrans_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "6dba04dbfb72ae3ebe5418ba33d087ba8aa8cb00"
+git-tree-sha1 = "a63799ff68005991f9d9491b6e95bd3478d783cb"
 uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
-version = "1.5.1+0"
+version = "1.6.0+0"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
@@ -2034,6 +3071,12 @@ deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 version = "1.59.0+0"
 
+[[deps.oneTBB_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "d5a767a3bb77135a99e433afe0eb14cd7f6914c3"
+uuid = "1317d2d5-d96f-522e-a858-c73665f53c3e"
+version = "2022.0.0+0"
+
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
@@ -2059,48 +3102,63 @@ version = "1.4.1+2"
 """
 
 # ╔═╡ Cell order:
-# ╟─d7c0a6ae-9a3b-4955-bda4-7325d15f08d9
-# ╟─f09fd8c0-416b-4f95-b107-a29a1b7cb3d1
-# ╟─21841a07-4cb7-4c08-ba43-78cf6feca25a
-# ╟─050fbb3b-61b4-492d-b988-798c1d75e2cb
-# ╟─ab16d475-a6bf-4dec-8d65-caf44c7bd4ae
-# ╠═a9927068-c517-4457-9394-823c8bdbeba4
-# ╠═0b0fbb27-6b38-4ab7-8b14-18a3023698b6
-# ╠═36b65f5b-f767-48fd-a43a-0da33ca35f59
-# ╟─8d3e1dc6-7d84-42e3-b228-9cf73313fc2b
-# ╟─d3c12dbb-0fc1-4d31-bf5e-5812c5e51fb8
-# ╟─bceadb12-7d88-4a8b-aae0-a696366627ce
-# ╟─59113f1c-5298-4eac-b3d5-7c54bc311e36
-# ╠═03e14a7c-4535-4635-9370-dcd5e83f99e4
-# ╟─0f93be8e-c045-4cba-8755-44bf01faad1e
-# ╟─26c44b6e-0e5a-47d1-a2d8-52cdc8a8b3f9
-# ╟─37675bef-ab4b-4b7a-a946-102148c6dce6
-# ╠═d49c4bf9-b542-4c21-a4c1-6423f9bdf059
-# ╠═28a49599-56dc-48b5-bafc-b7ed456e3e2d
-# ╠═ae23b057-cb23-408f-801d-db86b29ce617
-# ╟─5580ffda-b8fa-4504-830e-588c91bcdbda
-# ╟─4cb64ec9-4c1c-47ec-857d-45e764df2e56
-# ╟─db27aa1b-23da-4ace-bfda-9a34ecf4554a
-# ╟─947e2007-d7e9-4049-b324-0b41d13c80b3
-# ╟─58c42bec-6967-4023-8d52-eea5376ec0b8
-# ╟─8ee908d3-f28e-4146-8a10-811fde6938cc
-# ╠═7aa8b082-5642-474b-99aa-6279573f4102
-# ╠═5379f512-57ba-4247-bcc5-89d346177bca
-# ╟─52be580b-0add-4c32-aba1-719b5898c5fa
-# ╟─ddd1d5c6-cbfd-48e4-89b4-bfb3767d7c14
-# ╟─fcbbfa5d-bbf3-480b-b1b0-c4b835525113
-# ╠═059cb579-672a-4ff9-9477-c3decc2c785e
-# ╟─103b6c4c-a50c-4c61-8499-d78df265fae1
-# ╟─2b7a8b7e-a6d1-4360-b155-54c1bc771ee1
-# ╟─81f8893e-4c4b-4318-8e3d-70259cf4e044
-# ╟─9f4404c3-ca98-4be7-9c8f-187ff582250e
-# ╟─97e6ab22-be14-4b2a-9032-f5432839ac23
-# ╟─3e5f61b8-edbc-41b2-a047-0656bf419bdb
-# ╟─057a643b-128e-461e-9697-8b8344ce6331
-# ╠═6b1f254e-9926-40af-b1b9-4a30603ff595
-# ╟─729d9763-c8ca-4c2d-b208-33373bf66bf5
-# ╟─a692eefa-ef88-4132-9f25-e92937c22534
-# ╠═4715974e-c49a-4a64-b0a5-f0f6429f6c47
-# ╠═cab52545-97ed-4f3c-bbab-6e8797e5721e
+# ╟─f269ff32-3e80-4548-97c6-d337827db7aa
+# ╠═75ed8198-3115-4cf2-989d-93c4af8ed9c9
+# ╟─25699170-0fcd-11f0-2202-772042e9fd47
+# ╟─80ec79c4-9971-47a2-a884-5417254a31fd
+# ╟─0eae3652-7c88-4384-bede-797d0120d907
+# ╟─25d4e76d-b41a-4d57-bd8f-1e0e8cf15f32
+# ╟─f2c32e49-eca8-46bf-8912-2edca39b5054
+# ╟─5cafcc62-1f8e-4610-bfba-7cd0d4ac0484
+# ╟─d1af481b-5a8e-469f-982a-401fbffd4590
+# ╟─efda5197-b8ff-467a-8d32-6d9b7992a7ec
+# ╟─2a36ce70-5dc5-401d-864e-9b5e479b7913
+# ╟─12438dd0-68a0-4906-87ca-93d28d2a20b0
+# ╟─cc962df0-b6a0-481c-a95b-9265930d38d7
+# ╟─6f370423-0a7e-4a20-9c69-81fe352020a0
+# ╟─34394d4f-5c13-4fa5-977e-1f0aee78dc2c
+# ╟─8c1e2c97-381d-4c3b-af76-e269e46feb8c
+# ╠═0ccfae55-6162-4c97-a04d-2dd3c5d9370e
+# ╟─95432f3f-e4e5-48e4-abc2-522a1af4d402
+# ╟─7d85f4cd-e4e8-4076-afc5-33daf90c08fe
+# ╟─fb84175b-122e-4121-8498-085810627024
+# ╟─3ae662a1-2c66-4810-9770-514cc93897ff
+# ╟─077c4e59-79e9-4108-85c8-cf6e06458394
+# ╟─31184cf1-9242-4858-a7ca-4afb729ee1f0
+# ╟─c93a3123-22d0-4433-a6d3-34cc1395016a
+# ╟─1f1cab74-5f8d-4ab4-a12e-5e53a89d9080
+# ╟─d62f9aab-db3d-49f3-9844-ed9b091903ef
+# ╟─bab951b8-227f-4c89-a4a3-08f65a16fc35
+# ╟─627e2f9c-65d9-4645-a1a4-48c612876bd5
+# ╟─6a9d29ad-ecb7-4f9a-a86f-7e67e658a7de
+# ╟─5ba8beb8-8f36-4c90-ab8c-2f8004804819
+# ╟─ee9e248b-6002-463e-b736-9e91da06b00f
+# ╟─6f660144-df97-46a4-b83f-48f763b6407d
+# ╟─ad6af327-f560-4066-8139-beb2cc919197
+# ╟─711fdcf5-333a-44b9-a821-30cea343d89c
+# ╟─bb8551a1-8e35-49a4-8aa8-1fc89167ae7e
+# ╟─57fa7cfd-8521-46ca-b2fd-70dc506e2593
+# ╟─9a619a6a-0814-4c21-a3be-50041c3e198f
+# ╟─1ad1dc9b-f12d-4e9a-8ea8-c3c85ab738c3
+# ╟─4d4b096d-a87a-482f-a19c-7918e7af47fa
+# ╟─ddba2999-edab-4899-86d7-44c822e33ac1
+# ╟─ab4b6e35-bbd6-4c5d-ae6c-cf3cb2092a85
+# ╠═5e980df1-7333-4210-97c1-7aa3f0de9a67
+# ╟─5290729f-3d55-4e0d-9a76-64a5b36aa5b9
+# ╠═50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
+# ╟─d7213a5c-f663-420d-99fd-1ea15758c4bc
+# ╟─4d5dbdaa-7859-45fe-ba01-5d783400543c
+# ╟─973f9025-3d69-4b7a-b5c4-0c8a8ee5f2a8
+# ╟─d4e7f175-ae9a-40de-8c06-3005b55331fc
+# ╟─bc5edd76-7aa4-494c-b78e-2949a032b0a9
+# ╠═38a5bc03-c378-40e9-b05c-52f459a173cc
+# ╟─f0807783-6915-49e5-a49f-eb770695b0ce
+# ╟─f5902359-7f0b-4244-8ebd-191358e3a227
+# ╟─efa3f064-bc0f-491b-b06a-d8cd6d42a174
+# ╟─54ce63de-9640-4c00-b685-f8163f5f4bd8
+# ╟─70dfc064-52fe-40c2-8ca5-4f50d33711ab
+# ╟─cb94e83a-2e31-45d9-b4e0-b352d4595e99
+# ╟─d592e7bc-5f1a-41b6-8b13-ba34febeeefa
+# ╠═dab5f085-ac90-4342-b2eb-60b097320de9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

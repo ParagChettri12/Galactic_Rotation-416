@@ -33,7 +33,7 @@ begin
 	using Optim, PlutoTeachingTools
 	using Loess, Polynomials, GLM, LsqFit, KernelDensity
 
-	plotly()
+
 end
 
 
@@ -91,7 +91,7 @@ begin
 	file_path = "DataSets/DR3Training-1745182203820O-result.csv"
 	# Load the Gaia data
 	ts = CSV.read(file_path, DataFrame);
-end;
+end
 
 # ╔═╡ 0eae3652-7c88-4384-bede-797d0120d907
 begin
@@ -3166,7 +3166,7 @@ version = "1.4.1+2"
 # ╟─856584cb-f9c6-46b7-8129-1f9af94f65ce
 # ╟─75ed8198-3115-4cf2-989d-93c4af8ed9c9
 # ╟─25699170-0fcd-11f0-2202-772042e9fd47
-# ╟─80ec79c4-9971-47a2-a884-5417254a31fd
+# ╠═80ec79c4-9971-47a2-a884-5417254a31fd
 # ╟─0eae3652-7c88-4384-bede-797d0120d907
 # ╟─25d4e76d-b41a-4d57-bd8f-1e0e8cf15f32
 # ╟─f2c32e49-eca8-46bf-8912-2edca39b5054
@@ -3222,6 +3222,6 @@ version = "1.4.1+2"
 # ╟─70dfc064-52fe-40c2-8ca5-4f50d33711ab
 # ╟─cb94e83a-2e31-45d9-b4e0-b352d4595e99
 # ╟─d592e7bc-5f1a-41b6-8b13-ba34febeeefa
-# ╟─dab5f085-ac90-4342-b2eb-60b097320de9
+# ╠═dab5f085-ac90-4342-b2eb-60b097320de9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

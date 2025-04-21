@@ -30,27 +30,33 @@ begin
 	using StatsPlots 
 	using LaTeXStrings
 	using ColorSchemes
-	using Optim
+	using Optim, PlutoTeachingTools
 	using Loess, Polynomials, GLM, LsqFit, KernelDensity
 
-	plotly()  # Set the plotting backend separately, outside of `using`
+	plotly()
 end
 
 
-# ╔═╡ f269ff32-3e80-4548-97c6-d337827db7aa
+# ╔═╡ 44c5086c-9cef-4a27-8d1b-143af4e87eae
 md"""
 #### Parag Chettri ~ Santiago Berumen ~ Isaac Whitson
 # An Analysis of Milky Way's Rotation Curve: A Julia Approach
 ## Data from Gaia DR 3 vs DR2
 """
 
-# ╔═╡ 75ed8198-3115-4cf2-989d-93c4af8ed9c9
+# ╔═╡ 856584cb-f9c6-46b7-8129-1f9af94f65ce
+TableOfContents()
 
+# ╔═╡ 75ed8198-3115-4cf2-989d-93c4af8ed9c9
+begin
+	md"""
+	This notebook presents an analysis of the Milky Way's rotation curve using data from Gaia Data Release 3 (DR3), with comparisons to Data Release 2 (DR2). The objective of this study is to explore how Gaia’s astrometric data can be used to model the rotation curve of our galaxy and to identify the key parameters that influence those models. This project was developed as part of a computational astrophysics class project focued on galactic dynamics."""
+end
 
 # ╔═╡ 25699170-0fcd-11f0-2202-772042e9fd47
 begin
 	md"""
-	### QUERY to RUN
+	### GAIA QUERY
 
 	```sql
 	SELECT TOP 100000 
@@ -85,7 +91,7 @@ begin
 	file_path = "DataSets/DR3Training-1745182203820O-result.csv"
 	# Load the Gaia data
 	ts = CSV.read(file_path, DataFrame);
-end
+end;
 
 # ╔═╡ 0eae3652-7c88-4384-bede-797d0120d907
 begin
@@ -297,7 +303,7 @@ end
 # ╔═╡ 95432f3f-e4e5-48e4-abc2-522a1af4d402
 begin
 	md"""
-	### The Keplerian Orbit
+	# The Keplerian Orbit
 	"""
 end
 
@@ -340,9 +346,12 @@ end
 # ╔═╡ 31184cf1-9242-4858-a7ca-4afb729ee1f0
 begin
 	md"""
-	### A Linear Regression Fit
+	# A Linear Regression Fit
 	"""
 end
+
+# ╔═╡ 2a4415d5-d35a-4f20-bdac-f6833a637dfa
+aside(tip(md"""Slide the Velocity around to get the best residuals (centered on 0)."""))
 
 # ╔═╡ bab951b8-227f-4c89-a4a3-08f65a16fc35
 begin
@@ -423,6 +432,9 @@ $$f(x) = V_{x \to \infty} \left( 1 - e^{-0.6 x} \right)$$
 
     """
 end
+
+# ╔═╡ 46d90f90-2611-4fc2-aeea-3bb100cf13a0
+aside(tip(md"""Slide the Velocity around to get the best residuals (centered on 0)."""))
 
 # ╔═╡ 57fa7cfd-8521-46ca-b2fd-70dc506e2593
 begin
@@ -878,7 +890,7 @@ begin
 	
 	# Filter 
 	N_New = filter(row -> row.Galactocentric_Radius > 0 && 537 > row.V_phi > 0,  N)
-end
+end;
 
 # ╔═╡ efda5197-b8ff-467a-8d32-6d9b7992a7ec
 begin
@@ -1216,7 +1228,7 @@ begin
 	    label = "Test Objects",
 	    xlabel = "Galactocentric Radius (kpc)",
 	    ylabel = "Orbital Velocity (km/s)",
-	    title = "Training Curve vs Test Data 🚀",
+	    title = "Training Curve vs Test Data",
 	    shape = :circle,
 	    xlims = (0, 25),
 	    ylims = (0, 500),
@@ -1251,6 +1263,7 @@ Loess = "4345ca2d-374a-55d4-8d30-97f9976e7612"
 LsqFit = "2fda8390-95c7-5789-9bda-21331edee243"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PlutoTeachingTools = "661c6b06-c737-4d37-b85c-46df65de6f69"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -1271,6 +1284,7 @@ Loess = "~0.6.4"
 LsqFit = "~0.15.1"
 Optim = "~1.10.0"
 Plots = "~1.40.9"
+PlutoTeachingTools = "~0.3.1"
 PlutoUI = "~0.7.61"
 Polynomials = "~4.0.19"
 Statistics = "~1.11.1"
@@ -1283,7 +1297,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "8b3f89498e9fcad0eee888ecdb6e72fb573e5e9d"
+project_hash = "feb488668105fd7fd8e5b1e24f5ae32cde292491"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1431,6 +1445,12 @@ deps = ["Distances", "LinearAlgebra", "NearestNeighbors", "Printf", "Random", "S
 git-tree-sha1 = "3e22db924e2945282e70c33b75d4dde8bfa44c94"
 uuid = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
 version = "0.15.8"
+
+[[deps.CodeTracking]]
+deps = ["InteractiveUtils", "UUIDs"]
+git-tree-sha1 = "7eee164f122511d3e4e1ebadb7956939ea7e1c77"
+uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
+version = "1.3.6"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -1922,6 +1942,12 @@ git-tree-sha1 = "eac1206917768cb54957c65a615460d87b455fc1"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "3.1.1+0"
 
+[[deps.JuliaInterpreter]]
+deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
+git-tree-sha1 = "a434e811d10e7cbf4f0674285542e697dca605d0"
+uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
+version = "0.9.42"
+
 [[deps.KernelDensity]]
 deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
 git-tree-sha1 = "7d703202e65efa1369de1279c162b915e245eed1"
@@ -2103,6 +2129,12 @@ deps = ["Dates", "Logging"]
 git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.1.0"
+
+[[deps.LoweredCodeUtils]]
+deps = ["JuliaInterpreter"]
+git-tree-sha1 = "688d6d9e098109051ae33d126fcfc88c4ce4a021"
+uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
+version = "3.1.0"
 
 [[deps.LsqFit]]
 deps = ["Distributions", "ForwardDiff", "LinearAlgebra", "NLSolversBase", "Printf", "StatsAPI"]
@@ -2342,6 +2374,24 @@ version = "1.40.9"
     ImageInTerminal = "d8c32880-2388-543b-8c61-d9f865259254"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
+[[deps.PlutoHooks]]
+deps = ["InteractiveUtils", "Markdown", "UUIDs"]
+git-tree-sha1 = "072cdf20c9b0507fdd977d7d246d90030609674b"
+uuid = "0ff47ea0-7a50-410d-8455-4348d5de0774"
+version = "0.0.5"
+
+[[deps.PlutoLinks]]
+deps = ["FileWatching", "InteractiveUtils", "Markdown", "PlutoHooks", "Revise", "UUIDs"]
+git-tree-sha1 = "8f5fa7056e6dcfb23ac5211de38e6c03f6367794"
+uuid = "0ff47ea0-7a50-410d-8455-4348d5de0420"
+version = "0.1.6"
+
+[[deps.PlutoTeachingTools]]
+deps = ["Downloads", "HypertextLiteral", "Latexify", "Markdown", "PlutoLinks", "PlutoUI"]
+git-tree-sha1 = "8252b5de1f81dc103eb0293523ddf917695adea1"
+uuid = "661c6b06-c737-4d37-b85c-46df65de6f69"
+version = "0.3.1"
+
 [[deps.PlutoUI]]
 deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
 git-tree-sha1 = "7e71a55b87222942f0f9337be62e26b1f103d3e4"
@@ -2490,6 +2540,16 @@ deps = ["UUIDs"]
 git-tree-sha1 = "62389eeff14780bfe55195b7204c0d8738436d64"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.3.1"
+
+[[deps.Revise]]
+deps = ["CodeTracking", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "REPL", "Requires", "UUIDs", "Unicode"]
+git-tree-sha1 = "9bb80533cb9769933954ea4ffbecb3025a783198"
+uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
+version = "3.7.2"
+weakdeps = ["Distributed"]
+
+    [deps.Revise.extensions]
+    DistributedExt = "Distributed"
 
 [[deps.Rmath]]
 deps = ["Random", "Rmath_jll"]
@@ -3102,8 +3162,9 @@ version = "1.4.1+2"
 """
 
 # ╔═╡ Cell order:
-# ╟─f269ff32-3e80-4548-97c6-d337827db7aa
-# ╠═75ed8198-3115-4cf2-989d-93c4af8ed9c9
+# ╟─44c5086c-9cef-4a27-8d1b-143af4e87eae
+# ╟─856584cb-f9c6-46b7-8129-1f9af94f65ce
+# ╟─75ed8198-3115-4cf2-989d-93c4af8ed9c9
 # ╟─25699170-0fcd-11f0-2202-772042e9fd47
 # ╟─80ec79c4-9971-47a2-a884-5417254a31fd
 # ╟─0eae3652-7c88-4384-bede-797d0120d907
@@ -3118,7 +3179,7 @@ version = "1.4.1+2"
 # ╟─6f370423-0a7e-4a20-9c69-81fe352020a0
 # ╟─34394d4f-5c13-4fa5-977e-1f0aee78dc2c
 # ╟─8c1e2c97-381d-4c3b-af76-e269e46feb8c
-# ╠═0ccfae55-6162-4c97-a04d-2dd3c5d9370e
+# ╟─0ccfae55-6162-4c97-a04d-2dd3c5d9370e
 # ╟─95432f3f-e4e5-48e4-abc2-522a1af4d402
 # ╟─7d85f4cd-e4e8-4076-afc5-33daf90c08fe
 # ╟─fb84175b-122e-4121-8498-085810627024
@@ -3128,6 +3189,7 @@ version = "1.4.1+2"
 # ╟─c93a3123-22d0-4433-a6d3-34cc1395016a
 # ╟─1f1cab74-5f8d-4ab4-a12e-5e53a89d9080
 # ╟─d62f9aab-db3d-49f3-9844-ed9b091903ef
+# ╟─2a4415d5-d35a-4f20-bdac-f6833a637dfa
 # ╟─bab951b8-227f-4c89-a4a3-08f65a16fc35
 # ╟─627e2f9c-65d9-4645-a1a4-48c612876bd5
 # ╟─6a9d29ad-ecb7-4f9a-a86f-7e67e658a7de
@@ -3137,6 +3199,7 @@ version = "1.4.1+2"
 # ╟─ad6af327-f560-4066-8139-beb2cc919197
 # ╟─711fdcf5-333a-44b9-a821-30cea343d89c
 # ╟─bb8551a1-8e35-49a4-8aa8-1fc89167ae7e
+# ╟─46d90f90-2611-4fc2-aeea-3bb100cf13a0
 # ╟─57fa7cfd-8521-46ca-b2fd-70dc506e2593
 # ╟─9a619a6a-0814-4c21-a3be-50041c3e198f
 # ╟─1ad1dc9b-f12d-4e9a-8ea8-c3c85ab738c3
@@ -3145,13 +3208,13 @@ version = "1.4.1+2"
 # ╟─ab4b6e35-bbd6-4c5d-ae6c-cf3cb2092a85
 # ╠═5e980df1-7333-4210-97c1-7aa3f0de9a67
 # ╟─5290729f-3d55-4e0d-9a76-64a5b36aa5b9
-# ╠═50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
+# ╟─50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
 # ╟─d7213a5c-f663-420d-99fd-1ea15758c4bc
 # ╟─4d5dbdaa-7859-45fe-ba01-5d783400543c
 # ╟─973f9025-3d69-4b7a-b5c4-0c8a8ee5f2a8
 # ╟─d4e7f175-ae9a-40de-8c06-3005b55331fc
 # ╟─bc5edd76-7aa4-494c-b78e-2949a032b0a9
-# ╠═38a5bc03-c378-40e9-b05c-52f459a173cc
+# ╟─38a5bc03-c378-40e9-b05c-52f459a173cc
 # ╟─f0807783-6915-49e5-a49f-eb770695b0ce
 # ╟─f5902359-7f0b-4244-8ebd-191358e3a227
 # ╟─efa3f064-bc0f-491b-b06a-d8cd6d42a174
@@ -3159,6 +3222,6 @@ version = "1.4.1+2"
 # ╟─70dfc064-52fe-40c2-8ca5-4f50d33711ab
 # ╟─cb94e83a-2e31-45d9-b4e0-b352d4595e99
 # ╟─d592e7bc-5f1a-41b6-8b13-ba34febeeefa
-# ╠═dab5f085-ac90-4342-b2eb-60b097320de9
+# ╟─dab5f085-ac90-4342-b2eb-60b097320de9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

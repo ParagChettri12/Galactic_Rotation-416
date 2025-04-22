@@ -90,7 +90,7 @@ begin
 	file_path = "DataSets/DR3Training-1745182203820O-result.csv"
 	# Load the Gaia data
 	ts = CSV.read(file_path, DataFrame);
-end
+end;
 
 # ╔═╡ 0eae3652-7c88-4384-bede-797d0120d907
 begin
@@ -106,6 +106,9 @@ begin
 	"""
 end
 
+
+# ╔═╡ 0a0a44a9-a5c5-4b6d-9fd4-251ed7ab282a
+aside(tip(md"""Select each subset and compare the results by selecting and viewing results for other subsets."""))
 
 # ╔═╡ f2c32e49-eca8-46bf-8912-2edca39b5054
 begin
@@ -342,6 +345,12 @@ begin
 	"""
 end
 
+# ╔═╡ aecd1d21-64c7-4d34-aec5-ced9ab1fe28b
+begin
+	md""" ### Distribution of the $V_\phi$
+	"""
+end
+
 # ╔═╡ 31184cf1-9242-4858-a7ca-4afb729ee1f0
 begin
 	md"""
@@ -350,12 +359,19 @@ begin
 end
 
 # ╔═╡ 2a4415d5-d35a-4f20-bdac-f6833a637dfa
-aside(tip(md"""Slide the Velocity around to get the best residuals (centered on 0)."""))
+aside(tip(md"""Slide the Y intercept and Gradient around to get the best residuals (centered on 0)."""))
 
 # ╔═╡ bab951b8-227f-4c89-a4a3-08f65a16fc35
 begin
 	md"""
-	**Adjust Average Velocity:** $(@bind scaler1 Slider(100:5:300, show_value=true, default=200))
+	**Adjust Y Intercept Velocity:** $(@bind scaler1 Slider(100:1:300, show_value=true, default=200))
+	"""
+end
+
+# ╔═╡ 0c15f04c-4918-4ada-b79f-d73afc909ce0
+begin
+	md"""
+	**Adjust Velocity Gradient:** $(@bind gradient Slider(0:0.05:3, show_value=true, default=0.1))
 	"""
 end
 
@@ -371,6 +387,16 @@ end
 begin
 	md"""
 	We see from this residual plot that a simple linear relationship is not the best explanation for our data as the residiuals show a pattern that we seem to be missing."""
+end
+
+# ╔═╡ b6beab67-554c-48b5-9dd6-7d499ecd07d1
+begin
+	md""" ### χ² of the Linear Model
+Check if you'd like to see how the χ² varies with the two parameters in this distribution.  $(@bind ready_to_test3          CheckBox(; default=false))
+
+
+	
+	"""
 end
 
 # ╔═╡ ee9e248b-6002-463e-b736-9e91da06b00f
@@ -423,7 +449,7 @@ end
 begin
     md"""
 	
-Instead, we can understand this as a mathematical curve with minimal parameters. One of the possible approximations for this odd flat curve that we see in the moving-average plot is as follows:
+The moving average line gives us a rough idea of a two parameter function that could be fitted. To approximate, we can try this with a mathematical curve with minimal parameters. One of the possible approximations for this odd flat curve that we see in the moving-average plot is as follows:
 	
 $$f(x) = V_{x \to \infty} \left( 1 - e^{-S x} \right)$$
 
@@ -454,6 +480,16 @@ begin
 	md"""
 	**Adjust X-Axis Scale (View Window)  
 	Max R (kpc):** $(@bind x_max Slider(1:1:50; default=25, show_value=true))
+	"""
+end
+
+# ╔═╡ d6f1adf1-c6e1-445d-b5aa-623f180c821d
+begin
+	md"""  ### χ² of the Simple Model
+Check if you'd like to see how the χ² varies with the two parameters in this distribution.  $(@bind ready_to_test2          CheckBox(; default=false))
+
+
+	
 	"""
 end
 
@@ -537,13 +573,56 @@ begin
 	"""
 end
 
+# ╔═╡ caa38702-724b-4c98-bdb9-1a2e0d961c6e
+begin
+	md""" ## Nonlinear Least Squares Fit to Galactic Rotation Curve
+
+Here with the complex model, we will aim to fit a physical model of galactic rotation to observed data from the **Gaia** mission. The model predicts the orbital velocity $V_{\text{model}}$ as a function of galactocentric radius $r$ and a set of physical parameters $\boldsymbol{\theta}$.
+	
+### Observed Data
+	
+The observed data consist of:
+	
+$r_i$ Galactocentric radius at observation $i$ (`r_data1`)
+	
+$V_{\text{obs}, i}$ Observed orbital velocity at $r_i$ (`V_obs1`)
+	
+$V_{\text{model}}(r_i; \boldsymbol{\theta})$ Modeled orbital velocity using `rotation_model`
+	
+---
+	
+### Optimization Objective
+	
+
+We aim to find the parameter vector $\boldsymbol{\theta}^*$ that minimizes the discrepancy between the observed Gaia data and the rotation model:
+
+$\boldsymbol{\theta}^* = \arg\min_{\boldsymbol{\theta}} \sum_{i=1}^{n} \left( V_{\text{model}}(r_i; \boldsymbol{\theta}) - V_{\text{obs}, i} \right)^2$
+
+	
+	"""
+end
+
+
+# ╔═╡ ac0d8f5a-cc07-407e-b3fe-ce269e374f07
+aside(tip(md"""
+	initial_guess = [
+        200, 1.5,   # bulge
+        120, 3.0,   # disk
+        90,  4.0,   # HI
+        70,  3.5,   # H2
+        190, 15.0   # halo
+    ]
+"""))
+
 # ╔═╡ d7213a5c-f663-420d-99fd-1ea15758c4bc
 begin
 	md"""# Testing Data vs Training Data
-For our Test data, we will be using Data Release 2. We will apply the same coordinate transformation to this data as we did to the subsets and we will see if our training data's trends hold up.
+For our Test data, we will be using Data Release 2. We will apply the same coordinate transformation to this data as we did to the subsets and we will see if our training data's fitted parameter trends hold up.
 
 
-Check if you'd like to see how the test data compares to the training data: $(@bind ready_to_test          CheckBox(; default=false))
+Check if you'd like to see how the test data compares to the training data 
+	 
+(Enable the heatmap check boxes prior to this step): $(@bind ready_to_test          CheckBox(; default=false))
 
 
 	
@@ -933,7 +1012,7 @@ begin
     disc_z_rot = disc_y .* sin(tilt_angle) .+ disc_z .* cos(tilt_angle)
     
     # Plotting the disc
-    surface!(p, disc_x, disc_y_rot, disc_z_rot, alpha=0.5, color=:blue, legend = false )
+    surface!(p, disc_x, disc_y_rot, disc_z_rot, alpha=0.0001, color=:green, legend = false )
     
     p  # Displaying the plot
 end
@@ -967,38 +1046,78 @@ begin
 end
 
 
+# ╔═╡ 5ac03afa-e75b-4975-aa69-09f652ad091a
+begin
+
+    # Geting mean and std
+    vphi_mean = mean(N_New.V_phi)
+    vphi_std = std(N_New.V_phi)
+
+    # Plotting histogram
+    h = histogram(N_New.V_phi;
+        bins=200,
+        xlabel="Orbital Velocity V_phi (km/s)",
+        ylabel="Count",
+        title="Distribution of V_phi",
+        legend=false,
+        alpha=0.6,
+		xlims = (100, 350),
+        color=:blue,
+        normalize=false)
+
+    # Overlaying density estimation (KDE)
+    density!(N_New.V_phi;
+        linewidth=2,
+        color=:black,
+        label="KDE")
+
+    # Using y-axis max from the histogram to place annotation safely
+    y_max = Plots.ylims()[2]
+
+    # Annotating with mean and std
+    annotate!(300, y_max * 0.9,
+              text("μ = $(round(vphi_mean, digits=1))\nσ = $(round(vphi_std, digits=1))", :black, 10, :left))
+
+end
+
+
 # ╔═╡ c93a3123-22d0-4433-a6d3-34cc1395016a
 begin
-	
-	# 1. Prepare the data
-	# Replace these with your actual data vectors
-	r_data = N_New.Galactocentric_Radius  # Example Galactocentric Radius data
-	v_data = N_New.V_phi  # Example Orbital Velocity data
-	
-	# Remove any invalid points
-	valid = .!(isnan.(r_data) .| isnan.(v_data))
-	r_data = r_data[valid]
-	v_data = v_data[valid]
-	
-	# Create a DataFrame
-	df = DataFrame(Radius = r_data, Velocity = v_data)
-	
-	# 2. Fit a linear regression model
-	modelLR = lm(@formula(Velocity ~ Radius), df)
-	
-	# 3. Generate predictions
-	r_plot = range(minimum(r_data), maximum(r_data), length=200)
-	df_plot = DataFrame(Radius = r_plot)
-	predictions = predict(modelLR, df_plot)
-	
-	# 4. Creating plot
-	scatter(r_data, v_data, label="Data", color=:blue, alpha=0.6,
-	        xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)",
-	        title="Linear Regression Fit", legend=:topleft)
-	
-	plot!(r_plot, predictions, label="Best-Fit Line", color=:red, lw=2)
-	
+    # 1. Preparing the data
+    # Replace these with our actual data vectors
+    r_data = N_New.Galactocentric_Radius  
+    v_data = N_New.V_phi 
+    
+    # Remove any invalid points
+    valid = .!(isnan.(r_data) .| isnan.(v_data))
+    r_data = r_data[valid]
+    v_data = v_data[valid]
+    
+    # Creating a DataFrame
+    df = DataFrame(Radius = r_data, Velocity = v_data)
+    
+    # 2. Fit a linear regression model
+    modelLR = lm(@formula(Velocity ~ Radius), df)
+    
+    # 3. Extract the gradient (slope) and y-intercept
+    slope = coef(modelLR)[2]  # Gradient (slope)
+    intercept = coef(modelLR)[1]  # Y-intercept
+    
+    # 4. Generating predictions
+    r_plot = range(minimum(r_data), maximum(r_data), length=200)
+    df_plot = DataFrame(Radius = r_plot)
+    predictions = predict(modelLR, df_plot)
+    
+    # 5. Creating plot
+    scatter(r_data, v_data, label="Data", color=:blue, alpha=0.6,
+            xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)",
+            title="Linear Regression Fit", legend=:topleft)
+    
+    plot!(r_plot, predictions, label="Best-Fit Line", color=:red, lw=2)
+
+
 end
+
 
 # ╔═╡ 1f1cab74-5f8d-4ab4-a12e-5e53a89d9080
 begin
@@ -1009,24 +1128,103 @@ end
 
 # ╔═╡ d62f9aab-db3d-49f3-9844-ed9b091903ef
 begin
-	
-	
-	# Scatter plot with filtered data (Assuming `N_filtered` is already defined)
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi, marker=:circle, label="Data Points", xlabel="Galactocentric Radius (kpc)", ylabel="Orbital Velocity (km/s)", title="Orbital Velocity vs. Galactocentric Radius", legend=false, alpha=0.3 , xlims=(0, x_max4), ylims=(0, 500))
-	
+    # Scatter plot with filtered data
+    scatter(N_New.Galactocentric_Radius, N_New.V_phi,
+            marker=:circle,
+            label="Data Points",
+            xlabel="Galactocentric Radius (kpc)",
+            ylabel="Orbital Velocity (km/s)",
+            title="Orbital Velocity vs. Galactocentric Radius",
+            legend=false,
+            alpha=0.3,
+            xlims=(0, x_max4),
+            ylims=(0, 500))
 
-	# Customize the plot further
-	xlabel!("Galactocentric Radius (kpc)")
-	ylabel!("Orbital Velocity (km/s)")
-	title!("A Linear Fit")
-	xlims!(0, x_max4)
-	ylims!(0, 450)
+    # Customizing the plot
+    xlabel!("Galactocentric Radius (kpc)")
+    ylabel!("Orbital Velocity (km/s)")
+    title!("A Linear Fit")
+    xlims!(0, x_max4)
+    ylims!(0, 450)
 
-	model1(x) = scaler1
+    # Constant model
+    model1(x) = gradient*(x) + scaler1
+
+    # Overlay the model curve
+    plot!(model1, 0:0.1:25,
+          color=:red,
+          lw=2,
+          label="Model",
+          xlims=(0, x_max4))
+
+    # Evaluate model at data points (optional: use binned or raw data)
+    expected1 = model1.(N_New.Galactocentric_Radius)
+
+    # Calculate chi-squared (assuming errors = 1)
+    chi_squared1 = sum(((N_New.V_phi .- expected1).^2) ./ expected1)
+
+    # Display chi-squared on plot
+    chi_str1 = "χ² = $(round(chi_squared1, digits=2))"
+    annotate!(5, 400, text(chi_str1, :black, 12))
+end
+
+
+# ╔═╡ 2f8a4d0b-9cbf-45ef-8ae8-4b4da80d24f8
+begin
+	if ready_to_test3 == true
+	    # Define the parameter ranges
+	    gradient_range = 0:0.05:2  # Adjust range and step as needed
+	    scaler_range0 = 100:10:300  # Adjust range and step as needed
+	    
+	    # Initialize a matrix to store chi-squared values
+	    chi_matrix0 = zeros(length(scaler_range0), length(gradient_range))
+	    
+	    # Loop over the parameter grid and compute chi-squared
+	    for (i, scaler1) in enumerate(scaler_range0)
+	        for (j, gradient) in enumerate(gradient_range)
+	            # Define the linear model
+	            model1(x) = gradient * x + scaler1
+	            
+	            # Evaluate model at data points
+	            expected1 = model1.(N_New.Galactocentric_Radius)
+	            
+	            # Calculate chi-squared (assuming errors = 1)
+	            chi_squared1 = sum(((N_New.V_phi .- expected1).^2) ./ expected1)
+	            
+	            # Store chi-squared value
+	            chi_matrix0[i, j] = chi_squared1
+	        end
+	    end
 	
-	# Overlay the model curve
-	plot!(model1, 0:0.1:25, color=:red, lw=2, label="Model", xlims= (0,x_max4))
+	    # Generate heatmap or contour plot
+	    heatmap(gradient_range, scaler_range0, chi_matrix0;
+	            xlabel="Gradient",
+	            ylabel="Scaler",
+	            title="Chi-squared Surface for Linear Fit",
+	            colorbar_title="χ²",
+	            c=:viridis)
+	
+	    # Optional: Highlight the minimum chi-squared value
+	    min_val0, min_idx0 = findmin(chi_matrix0)
+	    min_gradient0 = gradient_range[min_idx0[2]]
+	    min_scaler0 = scaler_range0[min_idx0[1]]
 
+		println("Minimum Chi-squared value: ", min_val0)
+		println("Best Gradient: ", min_gradient0)
+		println("Best Y Intercept: ", min_scaler0)
+
+
+	
+	    scatter!([min_gradient0], [min_scaler0],
+	             markersize=6,
+	             markercolor=:red,
+	             label="Min χ²")
+	
+	    # Annotate min χ² value
+	    annotate!(min_gradient0 + 0.05, min_scaler0,
+	              text("Min χ² = $(round(min_val0, digits=2))", :white, 10))
+	else
+	end
 end
 
 
@@ -1073,6 +1271,56 @@ begin
 	
 
 end
+
+# ╔═╡ d06197fe-3387-4b24-a0a3-4d42f5346715
+begin
+    if ready_to_test2 == true
+        scaler_range = 180:2:260
+        factor_range = 0:0.1:4
+
+        # Initialize chi-squared matrix
+        chi_matrix = zeros(length(scaler_range), length(factor_range))
+
+        # Compute chi-squared for each parameter pair
+        for (i, s) in enumerate(scaler_range)
+            for (j, f) in enumerate(factor_range)
+                model_tmp(x) = s * (1 - exp(-f * x))
+                expected_tmp = model_tmp.(x_bin_centers)
+                chi_matrix[i, j] = sum(((y_means .- expected_tmp).^2) ./ expected_tmp)
+            end
+        end
+
+        # Heatmap with fixed color range
+        heatmap(factor_range, scaler_range, chi_matrix;
+                xlabel="Factor",
+                ylabel="Scaler",
+                title="Chi-squared Surface",
+                colorbar_title="χ²",
+                c=:viridis,
+                clim=(0, 1300),
+                flipy=true)
+
+        # Locate and annotate the minimum
+        min_val, min_idx = findmin(chi_matrix)
+        min_scaler = scaler_range[min_idx[1]]
+        min_factor = factor_range[min_idx[2]]
+
+        # Print optimal parameters
+        println("Minimum χ²: ", round(min_val, digits=2))
+        println("Optimal scaler: ", min_scaler)
+        println("Optimal factor: ", round(min_factor, digits=2))
+
+        scatter!([min_factor], [min_scaler],
+                 markersize=6,
+                 markercolor=:red,
+                 label="Min χ²")
+
+        annotate!(min_factor + 0.05, min_scaler,
+                  text("Min χ² = $(round(min_val, digits=2))", :white, 10))
+    else
+    end
+end
+
 
 # ╔═╡ bb8551a1-8e35-49a4-8aa8-1fc89167ae7e
 begin
@@ -1176,7 +1424,7 @@ begin
         190, 15.0   # halo
     ]
 
-    # Fit the model to real Gaia-based data
+    # Fitting the model to real Gaia-based data
     fit = curve_fit(rotation_model, r_data1, V_obs1, initial_guess)
     fitted_params = fit.param
 
@@ -1194,7 +1442,7 @@ begin
     r_grid = range(minimum(r_data1), maximum(r_data1), length = 400)
     # ------------------------------------------------------------------
 
-    # Plot: Observed vs Fitted
+    # Plotting: Observed vs Fitted
     plot(r_data1, V_obs1; label = "Observed V_phi",
          seriestype = :scatter, alpha = 0.3, color = :gray, legendposition = :bottomright, xlims = (0,25))
     plot!(r_grid, rotation_model(r_grid, fitted_params);
@@ -1235,34 +1483,75 @@ begin
 	
 end;
 
+# ╔═╡ d2117e06-7344-4ebe-b691-7c46247368dd
+if ready_to_test == true
+    scatter(TestFrameCorrected.Galactocentric_Radius, TestFrameCorrected.V_phi;
+        markersize = 2,
+        alpha = 0.2,
+        label = "Test Objects",
+        xlabel = "Galactocentric Radius (kpc)",
+        ylabel = "Orbital Velocity (km/s)",
+        title = "Training Curve vs Test Data (COMPLEX MODEL)",
+        shape = :circle,
+        xlims = (0, 25),
+        ylims = (0, 500),
+        legend = true,
+        legendposition = :bottomright)
+
+    # Customize the plot further
+    xlabel!("Galactocentric Radius (kpc)")
+    ylabel!("Orbital Velocity (km/s)")
+    title!("Training Curve vs Test Data (SIMPLE MODEL)")
+    xlims!(0, 25)
+    ylims!(0, 500)
+
+    model2(x) = min_scaler * (1 - exp(-min_factor * x))
+
+    # Overlay the model curve
+    plot!(model, 0:0.1:25, color=:black, lw=2, label="Model", xlims=(0,25))
+
+    # Add annotation with proper tuple format
+    annotate!(5, 450, "χ² = $(round(min_val, digits=2))")
+else
+end
+
+
 # ╔═╡ d4e7f175-ae9a-40de-8c06-3005b55331fc
 begin
-	if ready_to_test == true
-	# First plot the test data as scatter
-	scatter(TestFrameCorrected.Galactocentric_Radius, TestFrameCorrected.V_phi,
-	    markersize = 2,
-	    alpha = 0.2,
-	    label = "Test Objects",
-	    xlabel = "Galactocentric Radius (kpc)",
-	    ylabel = "Orbital Velocity (km/s)",
-	    title = "Training Curve vs Test Data",
-	    shape = :circle,
-	    xlims = (0, 25),
-	    ylims = (0, 500),
-	    legend = true,
-	    legendposition = :bottomright)
-	
-	# Now overlaying the theoretical/model velocity curve
-	r_vals = range(0.1, stop=30.0, length=300)
-	v_vals = V.(r_vals)  # assuming V is your model velocity function
-	
-	plot!(r_vals, v_vals,
-	    label = "Model Curve",
-	    linewidth = 2,
-	    linecolor = :black)
-	else
-	end
+    if ready_to_test == true
+        # Plot test data
+        scatter(TestFrameCorrected.Galactocentric_Radius, TestFrameCorrected.V_phi;
+            markersize = 2,
+            alpha = 0.2,
+            label = "Test Objects",
+            xlabel = "Galactocentric Radius (kpc)",
+            ylabel = "Orbital Velocity (km/s)",
+            title = "Training Curve vs Test Data (COMPLEX MODEL)",
+            shape = :circle,
+            xlims = (0, 25),
+            ylims = (0, 500),
+            legend = true,
+            legendposition = :bottomright)
+
+        # Overlay model
+        radius_vals = range(0.1, stop=30.0, length=300)
+        model_velocities = V.(radius_vals)
+        plot!(radius_vals, model_velocities; label = "Model Curve", linewidth = 2, linecolor = :black)
+
+        # Compute chi-squared
+        model_test_vals = V.(TestFrameCorrected.Galactocentric_Radius)
+        residuals = TestFrameCorrected.V_phi .- model_test_vals
+
+        # Assuming unit errors for now
+        χ² = sum(residuals .^ 2)
+        dof = length(model_test_vals) - 10  # 10 model parameters: 
+        χ²_red = χ² / dof
+
+        # Annotate reduced chi-squared
+        annotate!(5, 450, text("χ² = $(round(χ²_red, digits=2))", :black, 12))
+    end
 end
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -3183,9 +3472,10 @@ version = "1.4.1+2"
 # ╟─856584cb-f9c6-46b7-8129-1f9af94f65ce
 # ╟─75ed8198-3115-4cf2-989d-93c4af8ed9c9
 # ╟─25699170-0fcd-11f0-2202-772042e9fd47
-# ╠═80ec79c4-9971-47a2-a884-5417254a31fd
+# ╟─80ec79c4-9971-47a2-a884-5417254a31fd
 # ╟─0eae3652-7c88-4384-bede-797d0120d907
 # ╟─25d4e76d-b41a-4d57-bd8f-1e0e8cf15f32
+# ╟─0a0a44a9-a5c5-4b6d-9fd4-251ed7ab282a
 # ╟─f2c32e49-eca8-46bf-8912-2edca39b5054
 # ╟─5cafcc62-1f8e-4610-bfba-7cd0d4ac0484
 # ╟─d1af481b-5a8e-469f-982a-401fbffd4590
@@ -3202,15 +3492,20 @@ version = "1.4.1+2"
 # ╟─fb84175b-122e-4121-8498-085810627024
 # ╟─3ae662a1-2c66-4810-9770-514cc93897ff
 # ╟─077c4e59-79e9-4108-85c8-cf6e06458394
+# ╟─aecd1d21-64c7-4d34-aec5-ced9ab1fe28b
+# ╟─5ac03afa-e75b-4975-aa69-09f652ad091a
 # ╟─31184cf1-9242-4858-a7ca-4afb729ee1f0
 # ╟─c93a3123-22d0-4433-a6d3-34cc1395016a
 # ╟─1f1cab74-5f8d-4ab4-a12e-5e53a89d9080
 # ╟─d62f9aab-db3d-49f3-9844-ed9b091903ef
 # ╟─2a4415d5-d35a-4f20-bdac-f6833a637dfa
 # ╟─bab951b8-227f-4c89-a4a3-08f65a16fc35
+# ╟─0c15f04c-4918-4ada-b79f-d73afc909ce0
 # ╟─627e2f9c-65d9-4645-a1a4-48c612876bd5
 # ╟─6a9d29ad-ecb7-4f9a-a86f-7e67e658a7de
 # ╟─5ba8beb8-8f36-4c90-ab8c-2f8004804819
+# ╟─b6beab67-554c-48b5-9dd6-7d499ecd07d1
+# ╟─2f8a4d0b-9cbf-45ef-8ae8-4b4da80d24f8
 # ╟─ee9e248b-6002-463e-b736-9e91da06b00f
 # ╟─6f660144-df97-46a4-b83f-48f763b6407d
 # ╟─ad6af327-f560-4066-8139-beb2cc919197
@@ -3221,15 +3516,20 @@ version = "1.4.1+2"
 # ╟─2f2c9c98-b5c2-46d0-a5e5-1dda3a9724fa
 # ╟─9a619a6a-0814-4c21-a3be-50041c3e198f
 # ╟─1ad1dc9b-f12d-4e9a-8ea8-c3c85ab738c3
+# ╟─d6f1adf1-c6e1-445d-b5aa-623f180c821d
+# ╟─d06197fe-3387-4b24-a0a3-4d42f5346715
 # ╟─4d4b096d-a87a-482f-a19c-7918e7af47fa
 # ╟─ddba2999-edab-4899-86d7-44c822e33ac1
 # ╟─ab4b6e35-bbd6-4c5d-ae6c-cf3cb2092a85
-# ╠═5e980df1-7333-4210-97c1-7aa3f0de9a67
+# ╟─5e980df1-7333-4210-97c1-7aa3f0de9a67
 # ╟─5290729f-3d55-4e0d-9a76-64a5b36aa5b9
+# ╟─caa38702-724b-4c98-bdb9-1a2e0d961c6e
+# ╟─ac0d8f5a-cc07-407e-b3fe-ce269e374f07
 # ╟─50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
 # ╟─d7213a5c-f663-420d-99fd-1ea15758c4bc
 # ╟─4d5dbdaa-7859-45fe-ba01-5d783400543c
 # ╟─973f9025-3d69-4b7a-b5c4-0c8a8ee5f2a8
+# ╟─d2117e06-7344-4ebe-b691-7c46247368dd
 # ╟─d4e7f175-ae9a-40de-8c06-3005b55331fc
 # ╟─bc5edd76-7aa4-494c-b78e-2949a032b0a9
 # ╟─38a5bc03-c378-40e9-b05c-52f459a173cc
@@ -3240,6 +3540,6 @@ version = "1.4.1+2"
 # ╟─70dfc064-52fe-40c2-8ca5-4f50d33711ab
 # ╟─cb94e83a-2e31-45d9-b4e0-b352d4595e99
 # ╟─d592e7bc-5f1a-41b6-8b13-ba34febeeefa
-# ╠═dab5f085-ac90-4342-b2eb-60b097320de9
+# ╟─dab5f085-ac90-4342-b2eb-60b097320de9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

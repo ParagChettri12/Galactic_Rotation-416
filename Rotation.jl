@@ -33,7 +33,6 @@ begin
 	using Optim, PlutoTeachingTools
 	using Loess, Polynomials, GLM, LsqFit, KernelDensity
 
-
 end
 
 
@@ -426,7 +425,7 @@ begin
 	
 Instead, we can understand this as a mathematical curve with minimal parameters. One of the possible approximations for this odd flat curve that we see in the moving-average plot is as follows:
 	
-$$f(x) = V_{x \to \infty} \left( 1 - e^{-0.6 x} \right)$$
+$$f(x) = V_{x \to \infty} \left( 1 - e^{-S x} \right)$$
 
 
 
@@ -434,12 +433,19 @@ $$f(x) = V_{x \to \infty} \left( 1 - e^{-0.6 x} \right)$$
 end
 
 # ╔═╡ 46d90f90-2611-4fc2-aeea-3bb100cf13a0
-aside(tip(md"""Slide the Velocity around to get the best residuals (centered on 0)."""))
+aside(tip(md"""Slide the Velocity and Scaling Factor around to get the best residuals (centered on 0) and the smallest χ² value."""))
 
 # ╔═╡ 57fa7cfd-8521-46ca-b2fd-70dc506e2593
 begin
 	md"""
-	**Adjust Average Velocity:** $(@bind scaler Slider(180:5:270, show_value=true, default=200))
+	**Adjust Average Velocity:** $(@bind scaler Slider(180:2:270, show_value=true, default=200))
+	"""
+end
+
+# ╔═╡ 2f2c9c98-b5c2-46d0-a5e5-1dda3a9724fa
+begin
+	md"""
+	**Adjust Exp Scaling Factor:** $(@bind factor Slider(0.2:0.05:4, show_value=true, default=0.5))
 	"""
 end
 
@@ -903,7 +909,7 @@ begin
     z = N_New.distance_kpc .* sin.(dec_rad)
 
     # Creating scatter plot
-    p = scatter(x, y, z, markersize = 2, title = "A Map of our DataSet (Over the Disc of the Milky Way", xlabel = "kpc_x", ylabel = "kpc_y", zlabel = "kpc_z", legend=false)
+    p = scatter(x, y, z, markersize = 2, title = "A Map of our DataSet (Over the Disc of the Milky Way", xlabel = "kpc_x", ylabel = "kpc_y", zlabel = "kpc_z", legend=false, aspect_ratio=:equal)
     
     # Setting manual limits
     xlims!(p, -20, 20)
@@ -1083,7 +1089,7 @@ begin
 	xlims!(0, x_max)
 	ylims!(0, 450)
 
-	model(x) = scaler * (1 - exp(-0.6 * x))
+	model(x) = scaler * (1 - exp(-factor * x))
 	
 	# Overlay the model curve
 	plot!(model, 0:0.1:25, color=:black, lw=2, label="Model", xlims= (0,x_max))
@@ -1092,6 +1098,17 @@ begin
 	plot!(x_bin_centers, y_means, 
 	      linewidth=2, color=:red, label="Moving Average (bin=0.2kpc)",
 	      marker=:circle, markersize=2)
+	# Evaluate model at the x_bin_centers (where moving average is computed)
+	expected = model.(x_bin_centers)
+
+	# Calculate chi-squared (assuming equal weights or errors of 1)
+	chi_squared = sum(((y_means .- expected).^2) ./ expected)
+
+	# Round for display
+	chi_str = "χ² = $(round(chi_squared, digits=2))"
+
+	# Add as annotation or text on plot
+	annotate!(5, 400, text(chi_str, :black, 12))
 end
 
 
@@ -1150,7 +1167,7 @@ begin
 
     # ------------------------------------------------------------------
 
-    # Initial parameter guess (can be tuned)
+    # Initial parameter guess 
     initial_guess = [
         200, 1.5,   # bulge
         120, 3.0,   # disk
@@ -3201,6 +3218,7 @@ version = "1.4.1+2"
 # ╟─bb8551a1-8e35-49a4-8aa8-1fc89167ae7e
 # ╟─46d90f90-2611-4fc2-aeea-3bb100cf13a0
 # ╟─57fa7cfd-8521-46ca-b2fd-70dc506e2593
+# ╟─2f2c9c98-b5c2-46d0-a5e5-1dda3a9724fa
 # ╟─9a619a6a-0814-4c21-a3be-50041c3e198f
 # ╟─1ad1dc9b-f12d-4e9a-8ea8-c3c85ab738c3
 # ╟─4d4b096d-a87a-482f-a19c-7918e7af47fa

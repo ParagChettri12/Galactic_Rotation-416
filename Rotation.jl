@@ -302,6 +302,12 @@ end
 	
 
 
+# ╔═╡ aecd1d21-64c7-4d34-aec5-ced9ab1fe28b
+begin
+	md""" ### Distribution of the $V_\phi$
+	"""
+end
+
 # ╔═╡ 95432f3f-e4e5-48e4-abc2-522a1af4d402
 begin
 	md"""
@@ -342,12 +348,6 @@ begin
 	md"""
 	Needless to say, the rotation of the galaxy is clearly not bound just to Keplarian parameters.
 	This has many reasons, but one of the most obvious ones being that there are many objects in this case and varying distances which increase the complexity with many interactions.
-	"""
-end
-
-# ╔═╡ aecd1d21-64c7-4d34-aec5-ced9ab1fe28b
-begin
-	md""" ### Distribution of the $V_\phi$
 	"""
 end
 
@@ -636,6 +636,35 @@ begin
 		$(@bind ready_to_test CheckBox(; default=false))
 		"""
 	end
+end
+
+
+# ╔═╡ 49146a3f-f7b4-42e6-aa8b-929be202f528
+begin
+	md""" # Conclusion
+
+	Surprisingly, our Simple model performed with a lower χ² than the Complex model.
+
+	### Why might this be?
+
+	1. **Overfitting in the Complex Model**: Complex models have more parameters, which give them more flexibility. However, this also increases the risk of overfitting, where the model starts fitting noise in the data rather than the underlying signal. The Simple model might perform better by avoiding this pitfall.
+
+	
+	2. **Poor Parameter Estimation in the Complex Model**: With more parameters, the optimization process can become harder, leading to poor convergence to the global minimum. If the fitting algorithm doesn't properly estimate the parameters of the complex model, the χ² could end up higher despite the model's complexity.
+
+	
+	3. **Unnecessary Complexity**: If the additional parameters in the complex model aren't actually necessary to describe the system, they can add noise rather than improving the model's accuracy. This would result in a higher χ² for the complex model.
+
+	
+	4. **Data Sparsity or Noise**: In cases where data is sparse or noisy, simpler models tend to perform better because they are less likely to fit random fluctuations in the data. The complex model may be "chasing" noise, which could inflate the χ².
+
+	
+	5. **Model Mis-specification**: If the complex model includes terms that don't match the underlying physical or observational process, it might perform worse, even though it's more complex. The simple model may align better with the true dynamics, leading to a lower χ².
+
+	
+	### In summary:
+	A lower χ² in our Simple model suggests it better captures the true underlying pattern in the data, without overfitting or misinterpreting the noise. This result highlights the importance of **model simplicity and generalizability** in data fitting.
+	"""
 end
 
 
@@ -1027,35 +1056,6 @@ begin
     p  # Displaying the plot
 end
 
-# ╔═╡ fb84175b-122e-4121-8498-085810627024
-begin
-
-	scatter(N_New.Galactocentric_Radius, N_New.V_phi,
-	    markerssize = 2,
-	    alpha = 0.3,
-	    legend = true,
-	    label = "Object",
-	    xlabel = "Galactocentric Radius (kpc)",
-	    ylabel = "Orbital Velocity (km/s)",
-	    title = "The Keplerian Orbital Curve",
-	    shape = :circle,
-	    xlims = (0, xmax),
-	    ylims = (0, 500),
-	    legendposition = :bottomright)
-
-	G = 4.302e-6  # kpc * (km/s)^2 / Msun
-
-	keplerian_velocity(r, M) = sqrt(G * M / r)
-
-	# Galactic rotation curve
-	r_values = 0.1:0.1:xmax  # Range of distances (kpc)
-	v_kepler = keplerian_velocity.(r_values, mass_slider)  # Keplerian velocity based on current mass
-
-	# Overlaying Keplerian curve
-	plot!(r_values, v_kepler, label = "Keplerian Curve", linewidth = 2, color = :red)
-end
-
-
 # ╔═╡ 5ac03afa-e75b-4975-aa69-09f652ad091a
 begin
 
@@ -1088,6 +1088,35 @@ begin
     annotate!(300, y_max * 0.9,
               text("μ = $(round(vphi_mean, digits=1))\nσ = $(round(vphi_std, digits=1))", :black, 10, :left))
 
+end
+
+
+# ╔═╡ fb84175b-122e-4121-8498-085810627024
+begin
+
+	scatter(N_New.Galactocentric_Radius, N_New.V_phi,
+	    markerssize = 2,
+	    alpha = 0.3,
+	    legend = true,
+	    label = "Object",
+	    xlabel = "Galactocentric Radius (kpc)",
+	    ylabel = "Orbital Velocity (km/s)",
+	    title = "The Keplerian Orbital Curve",
+	    shape = :circle,
+	    xlims = (0, xmax),
+	    ylims = (0, 500),
+	    legendposition = :bottomright)
+
+	G = 4.302e-6  # kpc * (km/s)^2 / Msun
+
+	keplerian_velocity(r, M) = sqrt(G * M / r)
+
+	# Galactic rotation curve
+	r_values = 0.1:0.1:xmax  # Range of distances (kpc)
+	v_kepler = keplerian_velocity.(r_values, mass_slider)  # Keplerian velocity based on current mass
+
+	# Overlaying Keplerian curve
+	plot!(r_values, v_kepler, label = "Keplerian Curve", linewidth = 2, color = :red)
 end
 
 
@@ -3543,6 +3572,7 @@ version = "1.4.1+2"
 # ╟─973f9025-3d69-4b7a-b5c4-0c8a8ee5f2a8
 # ╟─d2117e06-7344-4ebe-b691-7c46247368dd
 # ╟─d4e7f175-ae9a-40de-8c06-3005b55331fc
+# ╟─49146a3f-f7b4-42e6-aa8b-929be202f528
 # ╟─bc5edd76-7aa4-494c-b78e-2949a032b0a9
 # ╟─38a5bc03-c378-40e9-b05c-52f459a173cc
 # ╟─f0807783-6915-49e5-a49f-eb770695b0ce

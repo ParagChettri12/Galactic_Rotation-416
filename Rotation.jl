@@ -1519,7 +1519,7 @@ begin
 	    model2(x) = min_scaler * (1 - exp(-min_factor * x))
 	
 	    # Overlay the model curve
-	    plot!(model, 0:0.1:25, color=:black, lw=2, label="Model", xlims=(0,25))
+	    plot!(model2, 0:0.1:25, color=:black, lw=2, label="Model", xlims=(0,25))
 	
 	    # Add annotation with proper tuple format
 	    annotate!(5, 450, "χ² = $(round(min_val, digits=2))")

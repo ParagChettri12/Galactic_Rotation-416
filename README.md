@@ -19,6 +19,7 @@ Methodology:
  - Coordinate transformations from equatorial to galactocentric frames
  - Velocity calculations including proper motion corrections
  - Keplerian and dark matter-corrected rotation curve modeling
+ - Calculating and comparing χ² for all models
  - Nonlinear regression fitting to determine galactic mass components
 
 Notebook Structure

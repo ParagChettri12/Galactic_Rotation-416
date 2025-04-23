@@ -619,15 +619,25 @@ begin
 	md"""# Testing Data vs Training Data
 For our Test data, we will be using Data Release 2. We will apply the same coordinate transformation to this data as we did to the subsets and we will see if our training data's fitted parameter trends hold up.
 
-
-Check if you'd like to see how the test data compares to the training data 
-	 
-(Enable the heatmap check boxes prior to this step): $(@bind ready_to_test          CheckBox(; default=false))
-
-
+*(Enable the heatmap checkboxes prior to this step.)*
 	
 	"""
 end
+
+# ╔═╡ 947ecb12-3a9e-4af6-8539-9c5aa23a3e3c
+begin
+	if ready_to_test2 && ready_to_test3
+		md"""
+		### ✅ Model Testing Ready
+
+		Check if you'd like to see how the test data compares to the training data.
+
+
+		$(@bind ready_to_test CheckBox(; default=false))
+		"""
+	end
+end
+
 
 # ╔═╡ bc5edd76-7aa4-494c-b78e-2949a032b0a9
 begin
@@ -1484,41 +1494,42 @@ begin
 end;
 
 # ╔═╡ d2117e06-7344-4ebe-b691-7c46247368dd
-if ready_to_test == true
-    scatter(TestFrameCorrected.Galactocentric_Radius, TestFrameCorrected.V_phi;
-        markersize = 2,
-        alpha = 0.2,
-        label = "Test Objects",
-        xlabel = "Galactocentric Radius (kpc)",
-        ylabel = "Orbital Velocity (km/s)",
-        title = "Training Curve vs Test Data (COMPLEX MODEL)",
-        shape = :circle,
-        xlims = (0, 25),
-        ylims = (0, 500),
-        legend = true,
-        legendposition = :bottomright)
-
-    # Customize the plot further
-    xlabel!("Galactocentric Radius (kpc)")
-    ylabel!("Orbital Velocity (km/s)")
-    title!("Training Curve vs Test Data (SIMPLE MODEL)")
-    xlims!(0, 25)
-    ylims!(0, 500)
-
-    model2(x) = min_scaler * (1 - exp(-min_factor * x))
-
-    # Overlay the model curve
-    plot!(model, 0:0.1:25, color=:black, lw=2, label="Model", xlims=(0,25))
-
-    # Add annotation with proper tuple format
-    annotate!(5, 450, "χ² = $(round(min_val, digits=2))")
-else
+begin
+	if @isdefined(ready_to_test) && ready_to_test
+	    scatter(TestFrameCorrected.Galactocentric_Radius, TestFrameCorrected.V_phi;
+	        markersize = 2,
+	        alpha = 0.2,
+	        label = "Test Objects",
+	        xlabel = "Galactocentric Radius (kpc)",
+	        ylabel = "Orbital Velocity (km/s)",
+	        title = "Training Curve vs Test Data (COMPLEX MODEL)",
+	        shape = :circle,
+	        xlims = (0, 25),
+	        ylims = (0, 500),
+	        legend = true,
+	        legendposition = :bottomright)
+	
+	    # Customize the plot further
+	    xlabel!("Galactocentric Radius (kpc)")
+	    ylabel!("Orbital Velocity (km/s)")
+	    title!("Training Curve vs Test Data (SIMPLE MODEL)")
+	    xlims!(0, 25)
+	    ylims!(0, 500)
+	
+	    model2(x) = min_scaler * (1 - exp(-min_factor * x))
+	
+	    # Overlay the model curve
+	    plot!(model, 0:0.1:25, color=:black, lw=2, label="Model", xlims=(0,25))
+	
+	    # Add annotation with proper tuple format
+	    annotate!(5, 450, "χ² = $(round(min_val, digits=2))")
+	else
+	end
 end
-
 
 # ╔═╡ d4e7f175-ae9a-40de-8c06-3005b55331fc
 begin
-    if ready_to_test == true
+   if @isdefined(ready_to_test) && ready_to_test
         # Plot test data
         scatter(TestFrameCorrected.Galactocentric_Radius, TestFrameCorrected.V_phi;
             markersize = 2,
@@ -3527,6 +3538,7 @@ version = "1.4.1+2"
 # ╟─ac0d8f5a-cc07-407e-b3fe-ce269e374f07
 # ╟─50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
 # ╟─d7213a5c-f663-420d-99fd-1ea15758c4bc
+# ╟─947ecb12-3a9e-4af6-8539-9c5aa23a3e3c
 # ╟─4d5dbdaa-7859-45fe-ba01-5d783400543c
 # ╟─973f9025-3d69-4b7a-b5c4-0c8a8ee5f2a8
 # ╟─d2117e06-7344-4ebe-b691-7c46247368dd

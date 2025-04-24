@@ -19,6 +19,7 @@ end
 # ╔═╡ dab5f085-ac90-4342-b2eb-60b097320de9
 begin
 	using CSV
+	using Pluto
 	using DataFrames
 	using PlutoUI
 	using Plots
@@ -304,7 +305,7 @@ end
 
 # ╔═╡ aecd1d21-64c7-4d34-aec5-ced9ab1fe28b
 begin
-	md""" ### Distribution of the $V_\phi$
+	md""" # Distribution of the $V_\phi$
 	"""
 end
 
@@ -613,6 +614,14 @@ aside(tip(md"""
         190, 15.0   # halo
     ]
 """))
+
+# ╔═╡ ff108956-5da7-41b9-a652-34ebf2b01efd
+begin
+      md"""
+      Select one half of the parameters of which you'd like to see the history of optimization: $@bind parameter_choice PlutoUI.Select([1 => "First 5 Parameters", 2 => "Second 5 Parameters"]; default = 1)
+
+      """
+end
 
 # ╔═╡ d7213a5c-f663-420d-99fd-1ea15758c4bc
 begin
@@ -1016,46 +1025,6 @@ begin
 	N_New = filter(row -> row.Galactocentric_Radius > 0 && 537 > row.V_phi > 0,  N)
 end;
 
-# ╔═╡ efda5197-b8ff-467a-8d32-6d9b7992a7ec
-begin
-
-    ra_rad = deg2rad.(N_New.ra)
-    dec_rad = deg2rad.(N_New.dec)
-    
-    x = N_New.distance_kpc .* cos.(dec_rad) .* cos.(ra_rad)
-    y = N_New.distance_kpc .* cos.(dec_rad) .* sin.(ra_rad)
-    z = N_New.distance_kpc .* sin.(dec_rad)
-
-    # Creating scatter plot
-    p = scatter(x, y, z, markersize = 2, title = "A Map of our DataSet (Over the Disc of the Milky Way", xlabel = "kpc_x", ylabel = "kpc_y", zlabel = "kpc_z", legend=false, aspect_ratio=:equal)
-    
-    # Setting manual limits
-    xlims!(p, -20, 20)
-    ylims!(p, -20, 20)
-    zlims!(p, -20, 20)
-    
-    # Create a galactic disc (radius 13 kpc)
-    θ = range(0, 2π, length=100)  # Angle for circle
-    rr = range(0, 13, length=20)   # Radius steps
-    
-    # Creating disc points (initially in XY plane)
-    disc_x = [ri * cos(θi) for ri in rr, θi in θ]
-    disc_y = [ri * sin(θi) for ri in rr, θi in θ] .- 7.7
-    disc_z = zeros(size(disc_x))
-    
-    # Known galactic plane tilt (approximate)
-    tilt_angle = deg2rad(28)  
-    
-    # Rotating disc to match galactic plane tilt
-    disc_y_rot = disc_y .* cos(tilt_angle) .- disc_z .* sin(tilt_angle)
-    disc_z_rot = disc_y .* sin(tilt_angle) .+ disc_z .* cos(tilt_angle)
-    
-    # Plotting the disc
-    surface!(p, disc_x, disc_y_rot, disc_z_rot, alpha=0.0001, color=:green, legend = false )
-    
-    p  # Displaying the plot
-end
-
 # ╔═╡ 5ac03afa-e75b-4975-aa69-09f652ad091a
 begin
 
@@ -1452,8 +1421,15 @@ begin
     r_data1 = N_New.Galactocentric_Radius
     V_obs1  = N_New.V_phi
 	V0_bulge_history = Float64[]
-
-
+	a_bulge_history = Float64[]
+	V0_disk_history = Float64[]
+	R_d_history = Float64[]
+	V0_HI_history = Float64[]
+	b_HI_history = Float64[]
+	V0_H2_history = Float64[]
+	R_H2_history = Float64[]
+	V_infinity_halo_history = Float64[]
+	c_halo_history = Float64[]
     # ------------------------------------------------------------------
 
     # Initial parameter guess 
@@ -1468,7 +1444,7 @@ begin
     # Fitting the model to real Gaia-based data
     fit = curve_fit(rotation_model, r_data1, V_obs1, initial_guess)
     fitted_params = fit.param
-	println(length(fit.param))
+
     println("\n Recovered Parameters from Gaia Data:")
     param_labels = [
         "V0_bulge", "a_bulge", "V0_disk", "R_d",
@@ -1597,24 +1573,70 @@ end
 
 # ╔═╡ e6c6a886-5e2b-4ae5-adee-0679a946ac60
 function tracked_model(r, params)
-    push!(V0_bulge_history, params[1])  # Track V0_bulge
+    push!(V0_bulge_history, params[1])
+	push!(a_bulge_history, params[2])
+	push!(V0_disk_history, params[3])
+	push!(R_d_history, params[4])
+	push!(V0_HI_history, params[5])
+	push!(b_HI_history, params[6])
+	push!(V0_H2_history, params[7])
+	push!(R_H2_history, params[8])
+	push!(V_infinity_halo_history, params[9])
+	push!(c_halo_history, params[10])
+	
+	# Track V0_bulge
     return rotation_model(r, params)    # Call your model properly
 end
 
 # ╔═╡ 7da05192-ccf0-427c-950b-fba6ac5a3d6c
 begin
-    fit2 = curve_fit(tracked_model, r_data1, V_obs1, initial_guess)
-    fitted_params2 = fit2.param
-
-    plot(1:length(V0_bulge_history), V0_bulge_history;
-        label = "V0_bulge",
+	if parameter_choice == 1
+		
+	    fit2 = curve_fit(tracked_model, r_data1, V_obs1, initial_guess)
+	    fitted_params2 = fit2.param
+	
+	    iterations = 1:length(V0_bulge_history)
+	
+	    # Start with a base plot using `plot`, not `plot!`
+	    plt = plot(iterations, V0_bulge_history;
+	        label = "V0_bulge",
+	        xlabel = "Iteration",
+	        ylabel = "Velocity (km/s)",
+	        title = "Evolution of Key Parameters During Optimization",
+	        lw = 2,
+	        xlims = (1, 1200),
+			ylims = (1,305),
+	        color = :green,
+	        legend = :outertopright  # Position legend well
+	    )
+	
+	    # Add additional parameter curves
+	    plot!(plt, iterations, V0_disk_history; label = "V0_disk", color = :blue, lw = 2)
+	    plot!(plt, iterations, V0_HI_history; label = "V0_HI", color = :red, lw = 2)
+	    plot!(plt, iterations, V0_H2_history; label = "V0_H2", color = :purple, lw = 2)
+	    plot!(plt, iterations, V_infinity_halo_history; label = "V_inf_halo", color = :orange, lw = 2)
+	else
+		iterations = 1:length(V0_bulge_history)
+		
+		  plt2 = plot(iterations, a_bulge_history;
+        label = "a_bulge",
         xlabel = "Iteration",
-        ylabel = "V0_bulge (km/s)",
-        title = "Evolution of V0_bulge During Optimization",
+        ylabel = "Parameter Value",
+        title = "Evolution of Remaining Parameters During Optimization",
         lw = 2,
-        xlims = (1, 1000),
-        color = :green,
-        legend = true)
+        xlims = (1, 1200),
+		ylims = (1, 15),
+        color = :teal,
+        legend = :outertopright
+	    )
+	
+	    plot!(plt2, iterations, R_d_history; label = "R_d", color = :brown, lw = 2)
+	    plot!(plt2, iterations, b_HI_history; label = "b_HI", color = :gray, lw = 2)
+	    plot!(plt2, iterations, R_H2_history; label = "R_H2", color = :darkorange, lw = 2)
+	    plot!(plt2, iterations, c_halo_history; label = "c_halo", color = :pink, lw = 2)
+	end
+
+
 end
 
 
@@ -1634,6 +1656,7 @@ Loess = "4345ca2d-374a-55d4-8d30-97f9976e7612"
 LsqFit = "2fda8390-95c7-5789-9bda-21331edee243"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Pluto = "c3e4b0f8-55cb-11ea-2926-15256bba5781"
 PlutoTeachingTools = "661c6b06-c737-4d37-b85c-46df65de6f69"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
@@ -1655,6 +1678,7 @@ Loess = "~0.6.4"
 LsqFit = "~0.15.1"
 Optim = "~1.10.0"
 Plots = "~1.40.9"
+Pluto = "~0.20.4"
 PlutoTeachingTools = "~0.3.1"
 PlutoUI = "~0.7.61"
 Polynomials = "~4.0.19"
@@ -1668,7 +1692,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "feb488668105fd7fd8e5b1e24f5ae32cde292491"
+project_hash = "f60f454cc97ea726386be7b167464b43ede898bb"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1884,6 +1908,12 @@ git-tree-sha1 = "d9d26935a0bcffc87d2613ce14c527c99fc543fd"
 uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
 version = "2.5.0"
 
+[[deps.Configurations]]
+deps = ["ExproniconLite", "OrderedCollections", "TOML"]
+git-tree-sha1 = "4358750bb58a3caefd5f37a4a0c5bfdbbf075252"
+uuid = "5218b696-f38b-4ac9-8b61-a12ec717816d"
+version = "0.17.6"
+
 [[deps.ConstructionBase]]
 git-tree-sha1 = "76219f1ed5771adbb096743bff43fb5fdd4c1157"
 uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
@@ -2020,6 +2050,16 @@ git-tree-sha1 = "d55dffd9ae73ff72f1c0482454dcf2ec6c6c4a63"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.6.5+0"
 
+[[deps.ExpressionExplorer]]
+git-tree-sha1 = "71d0768dd78ad62d3582091bf338d98af8bbda67"
+uuid = "21656369-7473-754a-2065-74616d696c43"
+version = "1.1.1"
+
+[[deps.ExproniconLite]]
+git-tree-sha1 = "c13f0b150373771b0fdc1713c97860f8df12e6c2"
+uuid = "55351af7-c7e9-48d6-89ff-24e801d99491"
+version = "0.10.14"
+
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]
 git-tree-sha1 = "53ebe7511fa11d33bec688a9178fac4e49eeee00"
@@ -2138,6 +2178,12 @@ version = "0.5.0"
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 version = "1.11.0"
+
+[[deps.FuzzyCompletions]]
+deps = ["REPL"]
+git-tree-sha1 = "be713866335f48cfb1285bff2d0cbb8304c1701c"
+uuid = "fb4132e2-a121-4a70-b8a1-d5b831dcdcc2"
+version = "0.5.5"
 
 [[deps.GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll", "libdecor_jll", "xkbcommon_jll"]
@@ -2376,6 +2422,11 @@ version = "0.16.6"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
 
+[[deps.LazilyInitializedFields]]
+git-tree-sha1 = "0f2da712350b020bc3957f269c9caad516383ee0"
+uuid = "0e77f7df-68c5-4e49-93ce-4cd80f5598bf"
+version = "1.3.0"
+
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
 uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
@@ -2529,6 +2580,12 @@ git-tree-sha1 = "72aebe0b5051e5143a079a4685a46da330a40472"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 version = "0.5.15"
 
+[[deps.Malt]]
+deps = ["Distributed", "Logging", "RelocatableFolders", "Serialization", "Sockets"]
+git-tree-sha1 = "02a728ada9d6caae583a0f87c1dd3844f99ec3fd"
+uuid = "36869731-bdee-424d-aa32-cab38c994e3b"
+version = "1.1.2"
+
 [[deps.Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
@@ -2563,6 +2620,12 @@ version = "1.11.0"
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 version = "2023.12.12"
+
+[[deps.MsgPack]]
+deps = ["Serialization"]
+git-tree-sha1 = "f5db02ae992c260e4826fe78c942954b48e1d9c2"
+uuid = "99f44e22-a591-53d1-9472-aa23ef4bd671"
+version = "1.2.1"
 
 [[deps.MultivariateStats]]
 deps = ["Arpack", "Distributions", "LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI", "StatsBase"]
@@ -2745,6 +2808,18 @@ version = "1.40.9"
     ImageInTerminal = "d8c32880-2388-543b-8c61-d9f865259254"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
+[[deps.Pluto]]
+deps = ["Base64", "Configurations", "Dates", "Downloads", "ExpressionExplorer", "FileWatching", "FuzzyCompletions", "HTTP", "HypertextLiteral", "InteractiveUtils", "Logging", "LoggingExtras", "MIMEs", "Malt", "Markdown", "MsgPack", "Pkg", "PlutoDependencyExplorer", "PrecompileSignatures", "PrecompileTools", "REPL", "RegistryInstances", "RelocatableFolders", "Scratch", "Sockets", "TOML", "Tables", "URIs", "UUIDs"]
+git-tree-sha1 = "b5509a2e4d4c189da505b780e3f447d1e38a0350"
+uuid = "c3e4b0f8-55cb-11ea-2926-15256bba5781"
+version = "0.20.4"
+
+[[deps.PlutoDependencyExplorer]]
+deps = ["ExpressionExplorer", "InteractiveUtils", "Markdown"]
+git-tree-sha1 = "e0864c15334d2c4bac8137ce3359f1174565e719"
+uuid = "72656b73-756c-7461-726b-72656b6b696b"
+version = "1.2.0"
+
 [[deps.PlutoHooks]]
 deps = ["InteractiveUtils", "Markdown", "UUIDs"]
 git-tree-sha1 = "072cdf20c9b0507fdd977d7d246d90030609674b"
@@ -2798,6 +2873,11 @@ deps = ["LinearAlgebra"]
 git-tree-sha1 = "17275485f373e6673f7e7f97051f703ed5b15b20"
 uuid = "85a6dd25-e78a-55b7-8502-1745935b8125"
 version = "0.2.4"
+
+[[deps.PrecompileSignatures]]
+git-tree-sha1 = "18ef344185f25ee9d51d80e179f8dad33dc48eb1"
+uuid = "91cefc8d-f054-46dc-8f8c-26e11d7c5411"
+version = "3.0.3"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
@@ -2899,6 +2979,12 @@ version = "0.6.12"
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "1.2.2"
+
+[[deps.RegistryInstances]]
+deps = ["LazilyInitializedFields", "Pkg", "TOML", "Tar"]
+git-tree-sha1 = "ffd19052caf598b8653b99404058fce14828be51"
+uuid = "2792f1a3-b283-48e8-9a74-f99dce5104f3"
+version = "0.1.0"
 
 [[deps.RelocatableFolders]]
 deps = ["SHA", "Scratch"]
@@ -3544,7 +3630,6 @@ version = "1.4.1+2"
 # ╟─f2c32e49-eca8-46bf-8912-2edca39b5054
 # ╟─5cafcc62-1f8e-4610-bfba-7cd0d4ac0484
 # ╟─d1af481b-5a8e-469f-982a-401fbffd4590
-# ╟─efda5197-b8ff-467a-8d32-6d9b7992a7ec
 # ╟─2a36ce70-5dc5-401d-864e-9b5e479b7913
 # ╟─12438dd0-68a0-4906-87ca-93d28d2a20b0
 # ╟─cc962df0-b6a0-481c-a95b-9265930d38d7
@@ -3591,6 +3676,7 @@ version = "1.4.1+2"
 # ╟─caa38702-724b-4c98-bdb9-1a2e0d961c6e
 # ╟─ac0d8f5a-cc07-407e-b3fe-ce269e374f07
 # ╟─50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
+# ╟─ff108956-5da7-41b9-a652-34ebf2b01efd
 # ╟─7da05192-ccf0-427c-950b-fba6ac5a3d6c
 # ╟─d7213a5c-f663-420d-99fd-1ea15758c4bc
 # ╟─947ecb12-3a9e-4af6-8539-9c5aa23a3e3c

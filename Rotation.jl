@@ -570,7 +570,7 @@ end
 
 # ╔═╡ 5290729f-3d55-4e0d-9a76-64a5b36aa5b9
 begin
-	md""" ### A Non-Linear Regression Fit to Guess the 10 Parameters for the Milky Way
+	md""" ## A Non-Linear Regression Fit to Guess the 10 Parameters for the Milky Way
 	"""
 end
 
@@ -1092,11 +1092,10 @@ end
 # ╔═╡ c93a3123-22d0-4433-a6d3-34cc1395016a
 begin
     # 1. Preparing the data
-    # Replace these with our actual data vectors
     r_data = N_New.Galactocentric_Radius  
     v_data = N_New.V_phi 
     
-    # Remove any invalid points
+    # Removing any invalid points
     valid = .!(isnan.(r_data) .| isnan.(v_data))
     r_data = r_data[valid]
     v_data = v_data[valid]
@@ -1129,7 +1128,7 @@ end
 
 # ╔═╡ 1f1cab74-5f8d-4ab4-a12e-5e53a89d9080
 begin
-	# 5. Print model summary
+	# 6. Print model summary
 	println("Linear Regression Model Summary:")
 	println(coeftable(modelLR))
 end
@@ -1158,20 +1157,20 @@ begin
     # Constant model
     model1(x) = gradient*(x) + scaler1
 
-    # Overlay the model curve
+    # Overlaying the model curve
     plot!(model1, 0:0.1:25,
           color=:red,
           lw=2,
           label="Model",
           xlims=(0, x_max4))
 
-    # Evaluate model at data points (optional: use binned or raw data)
+    # Evaluating model at data points 
     expected1 = model1.(N_New.Galactocentric_Radius)
 
-    # Calculate chi-squared (assuming errors = 1)
+    # Calculating chi-squared (assuming errors = 1)
     chi_squared1 = sum(((N_New.V_phi .- expected1).^2) ./ expected1)
 
-    # Display chi-squared on plot
+    # Displaying chi-squared on plot
     chi_str1 = "χ² = $(round(chi_squared1, digits=2))"
     annotate!(5, 400, text(chi_str1, :black, 12))
 end
@@ -1180,31 +1179,31 @@ end
 # ╔═╡ 2f8a4d0b-9cbf-45ef-8ae8-4b4da80d24f8
 begin
 	if ready_to_test3 == true
-	    # Define the parameter ranges
-	    gradient_range = 0:0.05:2  # Adjust range and step as needed
-	    scaler_range0 = 100:10:300  # Adjust range and step as needed
+	    # Defining the parameter ranges
+	    gradient_range = 0:0.05:2  
+	    scaler_range0 = 100:10:300  
 	    
-	    # Initialize a matrix to store chi-squared values
+	    # Initializing a matrix to store chi-squared values
 	    chi_matrix0 = zeros(length(scaler_range0), length(gradient_range))
 	    
-	    # Loop over the parameter grid and compute chi-squared
+	    # Looping over the parameter grid and computing chi-squared
 	    for (i, scaler1) in enumerate(scaler_range0)
 	        for (j, gradient) in enumerate(gradient_range)
-	            # Define the linear model
+	            # Defining the linear model
 	            model1(x) = gradient * x + scaler1
 	            
-	            # Evaluate model at data points
+	            # Evaluating model at data points
 	            expected1 = model1.(N_New.Galactocentric_Radius)
 	            
-	            # Calculate chi-squared (assuming errors = 1)
+	            # Calculating chi-squared (assuming errors = 1)
 	            chi_squared1 = sum(((N_New.V_phi .- expected1).^2) ./ expected1)
 	            
-	            # Store chi-squared value
+	            # Storing chi-squared value
 	            chi_matrix0[i, j] = chi_squared1
 	        end
 	    end
 	
-	    # Generate heatmap or contour plot
+	    # Generating heatmap 
 	    heatmap(gradient_range, scaler_range0, chi_matrix0;
 	            xlabel="Gradient",
 	            ylabel="Scaler",
@@ -1212,7 +1211,7 @@ begin
 	            colorbar_title="χ²",
 	            c=:viridis)
 	
-	    # Optional: Highlight the minimum chi-squared value
+	    
 	    min_val0, min_idx0 = findmin(chi_matrix0)
 	    min_gradient0 = gradient_range[min_idx0[2]]
 	    min_scaler0 = scaler_range0[min_idx0[1]]
@@ -1228,7 +1227,7 @@ begin
 	             markercolor=:red,
 	             label="Min χ²")
 	
-	    # Annotate min χ² value
+	    # Annotating min χ² value
 	    annotate!(min_gradient0 + 0.05, min_scaler0,
 	              text("Min χ² = $(round(min_val0, digits=2))", :white, 10))
 	else
@@ -1286,10 +1285,10 @@ begin
         scaler_range = 180:2:260
         factor_range = 0:0.1:4
 
-        # Initialize chi-squared matrix
+        # Initializing chi-squared matrix
         chi_matrix = zeros(length(scaler_range), length(factor_range))
 
-        # Compute chi-squared for each parameter pair
+        # Computing chi-squared for each parameter pair
         for (i, s) in enumerate(scaler_range)
             for (j, f) in enumerate(factor_range)
                 model_tmp(x) = s * (1 - exp(-f * x))
@@ -1308,12 +1307,12 @@ begin
                 clim=(0, 1300),
                 flipy=true)
 
-        # Locate and annotate the minimum
+        # Locating and annotating the minimum
         min_val, min_idx = findmin(chi_matrix)
         min_scaler = scaler_range[min_idx[1]]
         min_factor = factor_range[min_idx[2]]
 
-        # Print optimal parameters
+        # Printing optimal parameters
         println("Minimum χ²: ", round(min_val, digits=2))
         println("Optimal scaler: ", min_scaler)
         println("Optimal factor: ", round(min_factor, digits=2))
@@ -1417,7 +1416,7 @@ plot_residuals(N_New, r, V_total_curve)
 # ╔═╡ 50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
 
 begin
-    # Real data from Gaia analysis
+    # Data from Gaia analysis
     r_data1 = N_New.Galactocentric_Radius
     V_obs1  = N_New.V_phi
 	V0_bulge_history = Float64[]
@@ -1455,9 +1454,9 @@ begin
         println("$label: ", round(val, digits=3))
     end
 
-    # ------------------------------------------------------------------
+
     r_grid = range(minimum(r_data1), maximum(r_data1), length = 400)
-    # ------------------------------------------------------------------
+    
 
     # Plotting: Observed vs Fitted
     plot(r_data1, V_obs1; label = "Observed V_phi",

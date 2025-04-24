@@ -1,4 +1,4 @@
-# Santi Parag Isaac - 416 Project - An Analysis of Milkey Way's Rotation Curve
+# Santiago Parag Isaac - 416 Project - An Analysis of Milky Way's Rotation Curve
 
 This Pluto.jl notebook presents an analysis of the Milky Way's rotation curve using data from Gaia Data Release 3 (DR3) compared with DR2. The project was developed by Parag Chettri, Santiago Berumen, and Isaac Whitson as part of a computational astrophysics study. Our goal was to use Gaia's data to effectively find the models that describe the rotation curve of our galaxy and the parameters that determine the results we were finding.
 

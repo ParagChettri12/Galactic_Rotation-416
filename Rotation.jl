@@ -1451,6 +1451,8 @@ begin
     # Real data from Gaia analysis
     r_data1 = N_New.Galactocentric_Radius
     V_obs1  = N_New.V_phi
+	V0_bulge_history = Float64[]
+
 
     # ------------------------------------------------------------------
 
@@ -1466,7 +1468,7 @@ begin
     # Fitting the model to real Gaia-based data
     fit = curve_fit(rotation_model, r_data1, V_obs1, initial_guess)
     fitted_params = fit.param
-
+	println(length(fit.param))
     println("\n Recovered Parameters from Gaia Data:")
     param_labels = [
         "V0_bulge", "a_bulge", "V0_disk", "R_d",
@@ -1590,6 +1592,29 @@ begin
         # Annotate reduced chi-squared
         annotate!(5, 450, text("χ² = $(round(χ²_red, digits=2))", :black, 12))
     end
+end
+
+
+# ╔═╡ e6c6a886-5e2b-4ae5-adee-0679a946ac60
+function tracked_model(r, params)
+    push!(V0_bulge_history, params[1])  # Track V0_bulge
+    return rotation_model(r, params)    # Call your model properly
+end
+
+# ╔═╡ 7da05192-ccf0-427c-950b-fba6ac5a3d6c
+begin
+    fit2 = curve_fit(tracked_model, r_data1, V_obs1, initial_guess)
+    fitted_params2 = fit2.param
+
+    plot(1:length(V0_bulge_history), V0_bulge_history;
+        label = "V0_bulge",
+        xlabel = "Iteration",
+        ylabel = "V0_bulge (km/s)",
+        title = "Evolution of V0_bulge During Optimization",
+        lw = 2,
+        xlims = (1, 1000),
+        color = :green,
+        legend = true)
 end
 
 
@@ -3566,6 +3591,7 @@ version = "1.4.1+2"
 # ╟─caa38702-724b-4c98-bdb9-1a2e0d961c6e
 # ╟─ac0d8f5a-cc07-407e-b3fe-ce269e374f07
 # ╟─50dde6f7-8c8b-439d-9dbe-498ef41aa5b3
+# ╟─7da05192-ccf0-427c-950b-fba6ac5a3d6c
 # ╟─d7213a5c-f663-420d-99fd-1ea15758c4bc
 # ╟─947ecb12-3a9e-4af6-8539-9c5aa23a3e3c
 # ╟─4d5dbdaa-7859-45fe-ba01-5d783400543c
@@ -3582,6 +3608,7 @@ version = "1.4.1+2"
 # ╟─70dfc064-52fe-40c2-8ca5-4f50d33711ab
 # ╟─cb94e83a-2e31-45d9-b4e0-b352d4595e99
 # ╟─d592e7bc-5f1a-41b6-8b13-ba34febeeefa
+# ╟─e6c6a886-5e2b-4ae5-adee-0679a946ac60
 # ╟─dab5f085-ac90-4342-b2eb-60b097320de9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

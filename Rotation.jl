@@ -170,16 +170,6 @@ We will choose a value of $b = 1^\circ$.
 (This is reflected in our query as $abs(b) < 1$)
 """)
 
-# ╔═╡ d1af481b-5a8e-469f-982a-401fbffd4590
-begin
-	md"""
-	### Plotting the positions of our Stars (within our Galactic Coordinate Parameters)
-
-	We have chosen a value of $abs(b) < 1^\circ$. 
-	"""
-end
-	
-
 # ╔═╡ 12438dd0-68a0-4906-87ca-93d28d2a20b0
 details(
 md"""
@@ -676,6 +666,78 @@ begin
 	"""
 end
 
+
+# ╔═╡ b4792c2e-bc0e-4532-bdd6-341d498efa3b
+begin
+details(
+md"""
+A deeper dive into the uses of these results in approximating the Baryonic mass to Dark Matter Ratio! Click if you're curious for more details.""",
+	
+md"""
+### Inferring Mass Distribution from the Rotation Curve (No Luminosity Needed)
+
+Given the total rotation curve:
+
+$V_{\text{total}}(r) = \sqrt{V_{\text{bulge}}^2 + V_{\text{disk}}^2 + V_{\text{HI}}^2 + V_{\text{H2}}^2 + V_{\text{halo}}^2}$
+
+we can directly deduce the **mass distribution** of the Milky Way using Newtonian dynamics.
+
+---
+
+####  1. Total Enclosed Mass
+
+Using:
+
+$M_{\text{total}}(r) = \frac{r V_{\text{total}}^2(r)}{G}$
+
+This gives us the **cumulative mass** inside a given radius purely from the rotation speed.
+
+---
+
+#### 2. Component-wise Mass Contributions
+
+Each velocity component corresponds to a mass profile:
+
+$M_i(r) = \frac{r V_i^2(r)}{G}$
+
+Therefore:
+
+- $M_{\text{bulge}}(r) = \frac{r V_{\text{bulge}}^2(r)}{G}$
+- $M_{\text{disk}}(r) = \frac{r V_{\text{disk}}^2(r)}{G}$
+- $M_{\text{HI}}(r) = \frac{r V_{\text{HI}}^2(r)}{G}$
+- $M_{\text{H2}}(r) = \frac{r V_{\text{H2}}^2(r)}{G}$
+- $M_{\text{halo}}(r) = \frac{r V_{\text{halo}}^2(r)}{G}$
+
+---
+
+#### 3. Separate Baryonic and Dark Matter Components
+
+We define:
+
+$M_{\text{baryon}}(r) = M_{\text{bulge}}(r) + M_{\text{disk}}(r) + M_{\text{HI}}(r) + M_{\text{H2}}(r)$
+
+$M_{\text{DM}}(r) = M_{\text{halo}}(r)$
+
+---
+
+#### 4. Dark Matter to Baryonic Matter Ratio
+
+Now we can compute:
+
+$\frac{M_{\text{DM}}(r)}{M_{\text{baryon}}(r)} = \frac{M_{\text{halo}}(r)}{M_{\text{bulge}}(r) + M_{\text{disk}}(r) + M_{\text{HI}}(r) + M_{\text{H2}}(r)}$
+
+This ratio is derived **entirely from dynamics** — **no luminosity data required**!
+""")
+	
+end
+
+# ╔═╡ bc5b1463-433c-4f58-87a8-23df746df41b
+begin
+	md""" ### Unveil the Dark Matter to Baryonic Matter Ratio
+	Although this is derived using Newtonian principles and not based on Einsteinian GR, it is still quite a significant approximation! 
+	Uncheck to see: $(@bind DM CheckBox(; default=false))
+	"""
+end
 
 # ╔═╡ bc5edd76-7aa4-494c-b78e-2949a032b0a9
 begin
@@ -1476,6 +1538,59 @@ begin
 	
 	V(x) = total_rotation_curve(x, p1)
 end;
+
+# ╔═╡ 97a65042-c86f-4221-b4d6-2f92c30f317f
+begin
+	if DM == true
+	    # Grid for mass and ratio evaluation
+	    r_eval = range(minimum(r_data1), stop=maximum(r_data1), length=300)
+	
+	    # Local functions using fitted parameters (avoiding name conflict)
+	    Vb(r) = V0_bulge * r / (r^2 + a_bulge^2)^(3/4)
+	    Vd(r) = V0_disk * (r / R_d) * exp(-r / (2 * R_d))
+	    Vhi(r) = V0_HI * r / sqrt(r^2 + b_HI^2)
+	    Vh2(r) = V0_H2 * r * exp(-r / R_H2)
+	    Vhalo(r) = V_infinity_halo * r / sqrt(r^2 + c_halo^2) 
+	
+	    # Total velocity again lol
+	    Vtot(r) = sqrt(Vb(r)^2 + Vd(r)^2 + Vhi(r)^2 + Vh2(r)^2 + Vhalo(r)^2)
+	
+	    # Gravitational constant
+	    const G2 = 4.302e-6  # kpc⋅(km/s)^2⋅M_sun^(-1)
+	
+	    # Mass from velocity (Newtonian)
+	    M(v, r) = r * v(r)^2 / G2
+	
+	    # Component-wise mass
+	    M_bulge(r) = M(Vb, r)
+	    M_disk(r) = M(Vd, r)
+	    M_HI(r) = M(Vhi, r)
+	    M_H2(r) = M(Vh2, r)
+	    M_DM(r) = M(Vhalo, r)
+	
+	    # Total masses
+	    M_baryon(r) = M_bulge(r) + M_disk(r) + M_HI(r) + M_H2(r)
+	    DM_ratio(r) = M_DM(r) / M_baryon(r)
+	
+	    # Plots
+	    plot(r_eval, [M_baryon.(r_eval), M_DM.(r_eval)],
+	        label = ["Baryonic Mass" "Dark Matter Mass"],
+	        xlabel = "Radius (kpc)",
+	        ylabel = "Enclosed Mass (M☉)",
+	        title = "Enclosed Mass Profiles",
+	        yscale = :log10,
+	        linewidth = 2)
+	
+	    plot(r_eval, DM_ratio.(r_eval),
+	        label = "DM/Baryon Mass Ratio",
+	        xlabel = "Radius (kpc)",
+	        ylabel = "M_DM / M_baryon",
+	        title = "Dark Matter to Baryonic Matter Ratio vs Radius",
+	        linewidth = 2)
+	else
+	end
+end
+
 
 # ╔═╡ 4d5dbdaa-7859-45fe-ba01-5d783400543c
 begin
@@ -3628,7 +3743,6 @@ version = "1.4.1+2"
 # ╟─0a0a44a9-a5c5-4b6d-9fd4-251ed7ab282a
 # ╟─f2c32e49-eca8-46bf-8912-2edca39b5054
 # ╟─5cafcc62-1f8e-4610-bfba-7cd0d4ac0484
-# ╟─d1af481b-5a8e-469f-982a-401fbffd4590
 # ╟─2a36ce70-5dc5-401d-864e-9b5e479b7913
 # ╟─12438dd0-68a0-4906-87ca-93d28d2a20b0
 # ╟─cc962df0-b6a0-481c-a95b-9265930d38d7
@@ -3684,6 +3798,9 @@ version = "1.4.1+2"
 # ╟─d2117e06-7344-4ebe-b691-7c46247368dd
 # ╟─d4e7f175-ae9a-40de-8c06-3005b55331fc
 # ╟─49146a3f-f7b4-42e6-aa8b-929be202f528
+# ╟─b4792c2e-bc0e-4532-bdd6-341d498efa3b
+# ╟─bc5b1463-433c-4f58-87a8-23df746df41b
+# ╟─97a65042-c86f-4221-b4d6-2f92c30f317f
 # ╟─bc5edd76-7aa4-494c-b78e-2949a032b0a9
 # ╟─38a5bc03-c378-40e9-b05c-52f459a173cc
 # ╟─f0807783-6915-49e5-a49f-eb770695b0ce
